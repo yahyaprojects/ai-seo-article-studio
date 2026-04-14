@@ -1,20 +1,53 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { FiCheck, FiCopy, FiDownload, FiX } from "react-icons/fi";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { FiCheck, FiCopy, FiDownload, FiStar, FiX } from "react-icons/fi";
 
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { UI_TEXT } from "@/lib/constants";
 import type { GeneratedArticle } from "@/lib/types";
 
-/* ─── SEO Check Logic ─────────────────────────────────────────────────────── */
+/* ─── Types ───────────────────────────────────────────────────────────────── */
 
-interface SeoCheckItem {
+export interface SeoCheckItem {
   label: string;
   detail: string;
   passed: boolean;
 }
+
+/* ─── JSON syntax highlighter ─────────────────────────────────────────────── */
+
+function highlightJson(text: string): string {
+  if (!text.trim()) return "";
+
+  // Escape HTML-dangerous chars (keep quotes intact for regex)
+  const safe = text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+  // Capture: (string)(optional colon) | boolean/null | number
+  return safe.replace(
+    /("(?:\\.|[^"\\])*")(\s*:)?|(\b(?:true|false|null)\b)|(-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)/g,
+    (_, str, colon, keyword, num) => {
+      if (str !== undefined) {
+        // JSON key (string followed by colon)
+        if (colon) {
+          return `<span style="color:#9cdcfe">${str}</span><span style="color:#6b7280">${colon}</span>`;
+        }
+        // String value
+        return `<span style="color:#ce9178">${str}</span>`;
+      }
+      if (keyword !== undefined) {
+        return `<span style="color:#4fc1ff">${keyword}</span>`;
+      }
+      if (num !== undefined) {
+        return `<span style="color:#b5cea8">${num}</span>`;
+      }
+      return _;
+    },
+  );
+}
+
+/* ─── SEO check logic ─────────────────────────────────────────────────────── */
 
 function runSeoChecks(article: GeneratedArticle): SeoCheckItem[] {
   const focusKeyword = article.seo.keywords[0] ?? "";
@@ -89,6 +122,19 @@ function runSeoChecks(article: GeneratedArticle): SeoCheckItem[] {
   ];
 }
 
+/* ─── Tooltip wrapper ─────────────────────────────────────────────────────── */
+
+function Tooltip({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="group relative">
+      {children}
+      <span className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 -translate-x-1/2 whitespace-nowrap rounded-md bg-gray-900 px-2 py-1 text-xs text-white opacity-0 shadow-lg transition-opacity duration-150 group-hover:opacity-100">
+        {label}
+      </span>
+    </div>
+  );
+}
+
 /* ─── Component ───────────────────────────────────────────────────────────── */
 
 interface StreamingPreviewProps {
@@ -96,6 +142,7 @@ interface StreamingPreviewProps {
   containerHeight?: number | null;
   parsedArticle?: GeneratedArticle | null;
   isGenerationComplete?: boolean;
+  onImprove?: (failedChecks: SeoCheckItem[]) => void;
 }
 
 export function StreamingPreview({
@@ -103,24 +150,72 @@ export function StreamingPreview({
   containerHeight,
   parsedArticle,
   isGenerationComplete,
+  onImprove,
 }: StreamingPreviewProps) {
   const [copied, setCopied] = useState(false);
   const [activeTab, setActiveTab] = useState<"json" | "checklist">("json");
   const [visibleChecks, setVisibleChecks] = useState<SeoCheckItem[]>([]);
   const [isRunningChecks, setIsRunningChecks] = useState(false);
   const [checksComplete, setChecksComplete] = useState(false);
+  const [wasImproving, setWasImproving] = useState(false);
 
   const canExport = Boolean(streamedText.trim());
 
-  // Reset checklist state when a new generation starts
+  // Memoised highlighted JSON — only recomputes when generation completes or text changes
+  const highlightedJson = useMemo(() => {
+    if (!isGenerationComplete || !streamedText.trim()) return null;
+    return highlightJson(streamedText);
+  }, [isGenerationComplete, streamedText]);
+
+  /* ── Core checklist runner ──────────────────────────────────────────────── */
+
+  function runChecklist(article: GeneratedArticle) {
+    setActiveTab("checklist");
+    setVisibleChecks([]);
+    setChecksComplete(false);
+    setIsRunningChecks(true);
+
+    const checks = runSeoChecks(article);
+    checks.forEach((check, i) => {
+      setTimeout(() => {
+        setVisibleChecks((prev) => [...prev, check]);
+        if (i === checks.length - 1) {
+          setIsRunningChecks(false);
+          setChecksComplete(true);
+        }
+      }, i * 380);
+    });
+  }
+
+  function startSeoValidation() {
+    if (!parsedArticle) return;
+    runChecklist(parsedArticle);
+  }
+
+  /* ── Reset when generation starts / detect improvement ─────────────────── */
+
   useEffect(() => {
     if (!isGenerationComplete) {
+      // Track if we were showing a completed checklist when generation restarted
+      if (checksComplete) setWasImproving(true);
       setVisibleChecks([]);
       setChecksComplete(false);
       setIsRunningChecks(false);
       setActiveTab("json");
     }
-  }, [isGenerationComplete]);
+  }, [isGenerationComplete]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  /* ── Auto-rerun checklist after improvement ─────────────────────────────── */
+
+  useEffect(() => {
+    if (isGenerationComplete && wasImproving && parsedArticle) {
+      setWasImproving(false);
+      const t = setTimeout(() => runChecklist(parsedArticle), 700);
+      return () => clearTimeout(t);
+    }
+  }, [isGenerationComplete, wasImproving, parsedArticle]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  /* ── JSON actions ───────────────────────────────────────────────────────── */
 
   async function handleCopyJson() {
     if (!canExport) return;
@@ -129,7 +224,7 @@ export function StreamingPreview({
       setCopied(true);
       window.setTimeout(() => setCopied(false), 1800);
     } catch {
-      // Intentionally silent
+      // silent
     }
   }
 
@@ -137,33 +232,16 @@ export function StreamingPreview({
     if (!canExport) return;
     const blob = new Blob([streamedText], { type: "application/json;charset=utf-8" });
     const url = URL.createObjectURL(blob);
-    const anchor = document.createElement("a");
-    anchor.href = url;
-    anchor.download = "article-preview.json";
-    document.body.appendChild(anchor);
-    anchor.click();
-    document.body.removeChild(anchor);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "article-seo.json";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
     URL.revokeObjectURL(url);
   }
 
-  function startSeoValidation() {
-    if (!parsedArticle) return;
-    setActiveTab("checklist");
-    setVisibleChecks([]);
-    setChecksComplete(false);
-    setIsRunningChecks(true);
-
-    const checks = runSeoChecks(parsedArticle);
-    checks.forEach((check, index) => {
-      setTimeout(() => {
-        setVisibleChecks((prev) => [...prev, check]);
-        if (index === checks.length - 1) {
-          setIsRunningChecks(false);
-          setChecksComplete(true);
-        }
-      }, index * 380);
-    });
-  }
+  /* ── Derived values ─────────────────────────────────────────────────────── */
 
   const score =
     checksComplete && visibleChecks.length > 0
@@ -171,13 +249,10 @@ export function StreamingPreview({
       : null;
 
   const scoreColor =
-    score === null
-      ? ""
-      : score >= 80
-        ? "text-green-600"
-        : score >= 60
-          ? "text-yellow-500"
-          : "text-primary";
+    score === null ? "" : score >= 80 ? "text-green-600" : score >= 60 ? "text-yellow-500" : "text-primary";
+
+  const scoreBarColor =
+    score === null ? "" : score >= 80 ? "bg-green-500" : score >= 60 ? "bg-yellow-400" : "bg-primary";
 
   const scoreLabel =
     score === null
@@ -188,17 +263,23 @@ export function StreamingPreview({
           ? "Bien, pero hay margen de mejora"
           : "Necesita revisión antes de publicar";
 
+  const failedChecks = visibleChecks.filter((c) => !c.passed);
+  const canImprove = checksComplete && score !== null && score < 100 && Boolean(onImprove);
+
+  /* ─────────────────────────────────────────────────────────────────────────
+     Render
+  ───────────────────────────────────────────────────────────────────────── */
+
   return (
     <>
-      {/* Keyframe animation for checklist items */}
       <style>{`
         @keyframes checkItemIn {
           from { opacity: 0; transform: translateY(8px); }
-          to   { opacity: 1; transform: translateY(0);   }
+          to   { opacity: 1; transform: translateY(0); }
         }
-        .check-item-enter {
-          animation: checkItemIn 0.3s ease forwards;
-        }
+        .check-item-enter { animation: checkItemIn 0.3s ease forwards; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .spin { animation: spin 1s linear infinite; }
       `}</style>
 
       <Card
@@ -210,43 +291,13 @@ export function StreamingPreview({
           <h2 className="font-heading text-2xl font-semibold text-foreground">
             {UI_TEXT.streamPreviewTitle}
           </h2>
-
-          {activeTab === "json" && (
-            <div className="flex items-center gap-2">
-              <Button
-                aria-label="Copy JSON to clipboard"
-                className="h-10 px-3"
-                disabled={!canExport}
-                onClick={handleCopyJson}
-                title="Copy JSON"
-                type="button"
-                variant="secondary"
-              >
-                {copied ? <FiCheck className="h-4 w-4" /> : <FiCopy className="h-4 w-4" />}
-              </Button>
-              <Button
-                aria-label="Download JSON file"
-                className="inline-flex items-center gap-2"
-                disabled={!canExport}
-                onClick={handleDownloadJson}
-                title="Download JSON"
-                type="button"
-                variant="secondary"
-              >
-                <FiDownload className="h-4 w-4" />
-                JSON
-              </Button>
-            </div>
-          )}
         </div>
 
-        {/* ── Tab Bar ── */}
+        {/* ── Tab bar ── */}
         <div className="mb-4 flex gap-1 rounded-lg border border-border bg-secondary/40 p-1">
           <button
             className={`flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
-              activeTab === "json"
-                ? "bg-card text-foreground shadow-sm"
-                : "text-muted-foreground hover:text-foreground"
+              activeTab === "json" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
             }`}
             onClick={() => setActiveTab("json")}
             type="button"
@@ -254,7 +305,7 @@ export function StreamingPreview({
             JSON Preview
           </button>
           <button
-            className={`flex-1 inline-flex items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+            className={`inline-flex flex-1 items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
               activeTab === "checklist"
                 ? "bg-card text-foreground shadow-sm"
                 : "text-muted-foreground hover:text-foreground"
@@ -269,13 +320,64 @@ export function StreamingPreview({
           </button>
         </div>
 
-        {/* ── JSON Tab ── */}
+        {/* ════════════════════════════════════════════
+            JSON TAB
+        ════════════════════════════════════════════ */}
         {activeTab === "json" && (
           <>
-            <pre className="h-full min-h-0 flex-1 overflow-y-auto overflow-x-hidden whitespace-pre-wrap wrap-break-word rounded-md border border-border bg-background p-4 font-mono text-sm [scrollbar-width:thin] [scrollbar-color:var(--secondary)_transparent] [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-secondary [&::-webkit-scrollbar-thumb:hover]:bg-accent">
-              {streamedText || UI_TEXT.streamPreviewFallback}
-            </pre>
+            {/* Dark code container */}
+            <div className="relative min-h-0 flex-1 overflow-hidden rounded-lg border border-white/6">
+              {/* ── Sticky icon buttons ── */}
+              <div className="absolute right-2 top-2 z-10 flex gap-1.5">
+                <Tooltip label={copied ? "¡Copiado!" : "Copiar JSON"}>
+                  <button
+                    disabled={!canExport}
+                    onClick={handleCopyJson}
+                    className="flex h-7 w-7 items-center justify-center rounded-md bg-white/10 text-gray-400 transition-colors hover:bg-white/20 hover:text-white disabled:opacity-30"
+                    type="button"
+                  >
+                    {copied ? (
+                      <FiCheck className="h-3.5 w-3.5 text-green-400" />
+                    ) : (
+                      <FiCopy className="h-3.5 w-3.5" />
+                    )}
+                  </button>
+                </Tooltip>
+                <Tooltip label="Descargar JSON">
+                  <button
+                    disabled={!canExport}
+                    onClick={handleDownloadJson}
+                    className="flex h-7 w-7 items-center justify-center rounded-md bg-white/10 text-gray-400 transition-colors hover:bg-white/20 hover:text-white disabled:opacity-30"
+                    type="button"
+                  >
+                    <FiDownload className="h-3.5 w-3.5" />
+                  </button>
+                </Tooltip>
+              </div>
 
+              {/* ── JSON content ── */}
+              <div
+                className="h-full overflow-y-auto overflow-x-hidden [scrollbar-color:#333_transparent] [scrollbar-width:thin] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-white/10"
+                style={{ background: "#0f1117" }}
+              >
+                {highlightedJson ? (
+                  <pre
+                    className="min-h-full p-4 pt-10 font-mono text-sm leading-relaxed"
+                    style={{ color: "#d4d4d8" }}
+                    dangerouslySetInnerHTML={{ __html: highlightedJson }}
+                  />
+                ) : (
+                  <pre
+                    className="min-h-full whitespace-pre-wrap p-4 pt-10 font-mono text-sm leading-relaxed"
+                    style={{ color: streamedText ? "#d4d4d8" : "#6b7280" }}
+                  >
+                    {streamedText || UI_TEXT.streamPreviewFallback}
+                  </pre>
+                )}
+              </div>
+            </div>
+
+            {/* Audit button below JSON */}
             {isGenerationComplete && parsedArticle ? (
               <div className="mt-4">
                 <Button
@@ -291,9 +393,11 @@ export function StreamingPreview({
           </>
         )}
 
-        {/* ── Checklist Tab ── */}
+        {/* ════════════════════════════════════════════
+            CHECKLIST TAB
+        ════════════════════════════════════════════ */}
         {activeTab === "checklist" && (
-          <div className="flex h-full min-h-0 flex-1 flex-col overflow-y-auto rounded-md border border-border bg-background p-4 [scrollbar-width:thin] [scrollbar-color:var(--secondary)_transparent] [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-secondary [&::-webkit-scrollbar-thumb:hover]:bg-accent">
+          <div className="flex min-h-0 flex-1 flex-col overflow-y-auto rounded-md border border-border bg-background p-4 [scrollbar-color:var(--secondary)_transparent] [scrollbar-width:thin] [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-secondary">
             {visibleChecks.length === 0 && !isRunningChecks ? (
               <p className="text-sm text-muted-foreground">
                 {parsedArticle
@@ -302,9 +406,9 @@ export function StreamingPreview({
               </p>
             ) : (
               <ul className="grid gap-2">
-                {visibleChecks.map((check, index) => (
+                {visibleChecks.map((check, i) => (
                   <li
-                    key={index}
+                    key={i}
                     className="check-item-enter flex items-start gap-3 rounded-md border border-border p-3 text-sm"
                   >
                     <span
@@ -312,11 +416,7 @@ export function StreamingPreview({
                         check.passed ? "bg-green-500" : "bg-red-500"
                       }`}
                     >
-                      {check.passed ? (
-                        <FiCheck className="h-3 w-3" />
-                      ) : (
-                        <FiX className="h-3 w-3" />
-                      )}
+                      {check.passed ? <FiCheck className="h-3 w-3" /> : <FiX className="h-3 w-3" />}
                     </span>
                     <div className="grid gap-0.5">
                       <span className="font-medium text-foreground">{check.label}</span>
@@ -336,7 +436,7 @@ export function StreamingPreview({
               </ul>
             )}
 
-            {/* ── Score Card ── */}
+            {/* ── Score card ── */}
             {checksComplete && score !== null && (
               <div className="mt-6 rounded-lg border border-border bg-secondary/30 p-5 text-center">
                 <p className="text-sm text-muted-foreground">Puntuación SEO</p>
@@ -347,24 +447,33 @@ export function StreamingPreview({
                 <p className="mt-1 text-xs text-muted-foreground">{scoreLabel}</p>
                 <div className="mt-3 h-2 overflow-hidden rounded-full bg-secondary">
                   <div
-                    className={`h-full rounded-full transition-all duration-700 ${
-                      score >= 80
-                        ? "bg-green-500"
-                        : score >= 60
-                          ? "bg-yellow-400"
-                          : "bg-primary"
-                    }`}
+                    className={`h-full rounded-full transition-all duration-700 ${scoreBarColor}`}
                     style={{ width: `${score}%` }}
                   />
                 </div>
-                <Button
-                  className="mt-4 inline-flex items-center justify-center gap-2"
-                  onClick={startSeoValidation}
-                  type="button"
-                  variant="secondary"
-                >
-                  Repetir análisis
-                </Button>
+
+                <div className="mt-4 flex flex-col gap-2">
+                  {/* Perfeccionar SEO — only when score < 100 */}
+                  {canImprove && (
+                    <Button
+                      className="w-full inline-flex items-center justify-center gap-2"
+                      onClick={() => onImprove!(failedChecks)}
+                      type="button"
+                    >
+                      <FiStar className="h-4 w-4" />
+                      Perfeccionar SEO con IA
+                    </Button>
+                  )}
+
+                  <Button
+                    className="w-full inline-flex items-center justify-center gap-2"
+                    onClick={startSeoValidation}
+                    type="button"
+                    variant="secondary"
+                  >
+                    Repetir análisis
+                  </Button>
+                </div>
               </div>
             )}
           </div>

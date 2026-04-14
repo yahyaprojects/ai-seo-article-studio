@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { ChangeEvent, FormEvent, useEffect, useMemo, useRef, useState } from "react";
 
-import { StreamingPreview } from "@/components/admin/StreamingPreview";
+import { StreamingPreview, type SeoCheckItem } from "@/components/admin/StreamingPreview";
 import { ArticleContent } from "@/components/blog/ArticleContent";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
@@ -527,6 +527,63 @@ export function ArticleForm() {
     await generateArticle();
   }
 
+  async function handleImproveSeo(failedChecks: SeoCheckItem[]) {
+    if (!pendingArticle || failedChecks.length === 0) return;
+
+    setError("");
+    setStreamedText("");
+    setIsGenerating(true);
+
+    try {
+      const response = await fetch("/api/improve-article", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ article: pendingArticle, failedChecks }),
+      });
+
+      if (!response.ok || !response.body) {
+        throw new Error(ERROR_TEXT.generationFailed);
+      }
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let fullText = "";
+
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        fullText += decoder.decode(value, { stream: true });
+        setStreamedText(fullText);
+      }
+
+      let improved: GeneratedArticle;
+      try {
+        improved = parseGeneratedArticleJson(fullText, formData);
+      } catch {
+        throw new Error(ERROR_TEXT.invalidJson);
+      }
+
+      improved = {
+        ...improved,
+        seo: { ...improved.seo, slug: createSlug(improved.seo.slug || improved.seo.title || formData.title) },
+        // Keep the existing featured image from the original article
+        featuredImage: improved.featuredImage?.url ? improved.featuredImage : pendingArticle.featuredImage,
+        imageOptions: improved.imageOptions?.length ? improved.imageOptions : pendingArticle.imageOptions,
+      };
+
+      try {
+        await saveArticle(improved, "draft");
+      } catch {
+        // non-blocking
+      }
+      setPendingArticle(improved);
+    } catch {
+      setError(ERROR_TEXT.generationFailed);
+    } finally {
+      setIsGenerating(false);
+    }
+  }
+
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     await generateArticle();
@@ -650,6 +707,7 @@ export function ArticleForm() {
           streamedText={streamedText}
           parsedArticle={pendingArticle}
           isGenerationComplete={!isGenerating && Boolean(streamedText)}
+          onImprove={handleImproveSeo}
         />
       </div>
 
