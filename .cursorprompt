@@ -1,0 +1,298 @@
+Cursor Prompt — SEO Article Generator Demo
+Project Overview
+Build a demo web app for a client (bitzenmineria.com — Bitcoin mining niche, Spanish language). The app is a proof-of-concept that demonstrates automated SEO article generation using AI. The client fills a form with article data (title, meta description, editorial notes), the app generates a full SEO-optimized article in Spanish via Claude API, and displays it as a live blog post with a card in a blog listing — all in real time, no database.
+This is a DEMO, not a production app. Everything lives in React state. No database, no CMS integration. The goal is to visually demonstrate the end-to-end flow during a client meeting.
+
+Tech Stack
+·	Next.js 15 (App Router, TypeScript, Server Components by default)
+·	Tailwind CSS v4
+·	Anthropic Claude API (claude-sonnet-4-20250514) via @anthropic-ai/sdk
+·	Deployment target: Vercel
+
+CRITICAL — Design System (Clone from Portfolio)
+DO NOT use generic AI/SaaS aesthetics. No blue/purple gradients, no glassmorphism cards, no "AI glow" effects, no generic dark themes with neon accents.
+This app MUST use dark mode by default (add class="dark" to <html>). The portfolio is dark-dominant. The demo must feel like part of the same brand.
+Clone the design language from the portfolio. Here are the exact tokens:
+Color System (Dark Mode — primary mode)
+·	Background:oklch(0.145 0 0) — near-black (#1a1a1a equivalent)
+·	Foreground/Text:oklch(0.985 0 0) — near-white
+·	Card background:oklch(0.205 0 0) — slightly lighter than bg (#2e2e2e equivalent)
+·	Card foreground:oklch(0.985 0 0)
+·	Primary accent:#ff4d00 — vibrant orange-red. Use this for CTAs, active states, key highlights. Do NOT overuse — reserve for primary actions and key visual anchors.
+·	Primary foreground (on accent):#ffffff
+·	Hero text:#f6f7fc — slightly blue-tinted white for hero/heading areas
+·	Secondary surface:oklch(0.269 0 0) — used for secondary cards, badges, muted backgrounds
+·	Secondary foreground:oklch(0.985 0 0)
+·	Muted text:oklch(0.708 0 0) — for descriptions, timestamps, secondary info
+·	Border:oklch(1 0 0 / 10%) — very subtle white at 10% opacity
+·	Input border:oklch(1 0 0 / 15%) — slightly more visible for form fields
+·	Ring/focus:oklch(0.556 0 0) — medium gray for focus rings
+Fonts
+·	Body font: Roboto (loaded via --font-roboto CSS variable, set as --font-sans)
+·	Heading font: Anek Kannada (loaded via --font-anek-kannada, set as --font-heading)
+·	Monospace:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace
+·	Load both Roboto and Anek Kannada from Google Fonts via next/font/google in the root layout. Apply headings font to all h1-h6 elements via CSS.
+Border Radius
+·	Base radius:0.625rem (10px)
+·	Small (badges, tags):calc(0.625rem * 0.6) = ~6px
+·	Medium (inputs, small cards):calc(0.625rem * 0.8) = ~8px
+·	Large (cards, panels):0.625rem = 10px
+·	XL (modals, large containers):calc(0.625rem * 1.4) = ~14px
+Component Patterns
+·	Cards: Use bg-card background with border border-border (the 10% white border). Padding p-6. Rounded rounded-lg. No box shadows.
+·	Buttons (Primary):bg-[#ff4d00] text-white with hover:opacity-90 transition. Rounded rounded-md. Padding px-6 py-3. Font weight font-medium.
+·	Buttons (Secondary/Ghost):bg-secondary text-secondary-foreground or bg-transparent border border-border text-foreground hover:bg-secondary.
+·	Inputs:bg-transparent border border-input text-foreground rounded-md px-4 py-3. Focus state: focus:ring-2 focus:ring-ring focus:border-transparent.
+·	Badges/Tags:bg-secondary text-secondary-foreground rounded-sm px-2 py-1 text-xs font-medium.
+·	Transitions: All interactive elements get transition-all duration-150 ease-in-out. No bouncy animations, no spring physics.
+Typography Hierarchy
+·	Page titles (h1):font-heading text-4xl md:text-5xl font-bold text-hero-text
+·	Section headings (h2):font-heading text-2xl md:text-3xl font-semibold text-foreground
+·	Subsection (h3):font-heading text-xl font-semibold text-foreground
+·	Body text:font-sans text-base text-foreground leading-relaxed
+·	Small/caption:font-sans text-sm text-muted-foreground
+·	Monospace (code blocks, JSON):font-mono text-sm
+General Design Rules
+·	Dark mode is the ONLY mode. Do not implement light mode toggle.
+·	Generous whitespace — minimum gap-6 between sections, py-16 for page sections.
+·	Hierarchy through background shifts (bg → card → secondary), not shadows.
+·	Borders are extremely subtle (10% white). Don't make them more visible.
+·	The #ff4d00 orange is the ONLY color accent. Everything else is grayscale.
+·	Hover states: opacity shift (hover:opacity-90) or subtle bg change (hover:bg-secondary). Never color shifts or scale transforms.
+·	The app should feel like a natural extension of the portfolio — same DNA, same restraint.
+
+Project Structure
+/src
+  /app
+    /page.tsx                        → Homepage (hero + CTA to admin)
+    /admin/page.tsx                  → Article generation form (client component)
+    /preview/page.tsx                → Blog listing preview (client component)
+    /preview/[slug]/page.tsx         → Article page preview (client component)
+    /api/generate-article/route.ts   → POST: calls Claude, returns structured JSON
+    /layout.tsx                      → Root layout: Roboto + Anek Kannada via next/font/google, class="dark" on <html>
+    /globals.css                     → Copy the EXACT CSS variables from design tokens section above
+  /components
+    /ui
+      /Button.tsx
+      /Input.tsx
+      /Textarea.tsx
+      /Badge.tsx
+      /Card.tsx
+      /LoadingSpinner.tsx
+    /admin
+      /ArticleForm.tsx               → The generation form
+      /StreamingPreview.tsx           → Live article preview during generation
+    /blog
+      /ArticleCard.tsx               → Blog listing card component
+      /ArticleContent.tsx            → Full article renderer
+      /SeoMetadataPanel.tsx          → Collapsible panel showing all SEO data
+      /FaqSection.tsx                → FAQ accordion component
+    /layout
+      /Header.tsx                    → Site header/nav
+      /Footer.tsx                    → Site footer
+  /lib
+    /prompts.ts                      → System prompt + prompt builder
+    /types.ts                        → TypeScript interfaces
+    /constants.ts                    → App-wide constants
+    /utils.ts                        → Slug generation, text truncation, etc.
+  /stores
+    /useArticleStore.ts              → Zustand store for generated articles (in-memory state)
+
+
+Environment Variables
+Create .env.local:
+ANTHROPIC_API_KEY=sk-ant-...
+NEXT_PUBLIC_SITE_URL=http://localhost:3000
+NEXT_PUBLIC_CLIENT_DOMAIN=bitzenmineria.com
+
+ALL config values must come from env vars or constants. Zero hardcoded API keys, URLs, or magic strings in components.
+
+State Management
+Use Zustand for client-side article storage. NO database. NO localStorage.
+// /stores/useArticleStore.ts
+interface ArticleStore {
+  articles: GeneratedArticle[]
+  currentArticle: GeneratedArticle | null
+  isGenerating: boolean
+  addArticle: (article: GeneratedArticle) => void
+  setCurrentArticle: (article: GeneratedArticle | null) => void
+  setIsGenerating: (val: boolean) => void
+}
+
+Articles persist in memory for the duration of the session. Refresh = gone. That's fine for a demo.
+
+TypeScript Interfaces
+// /lib/types.ts
+
+export interface SeoMetadata {
+  title: string              // 55-60 chars
+  metaDescription: string    // 150-160 chars
+  slug: string
+  canonicalUrl: string
+  keywords: string[]         // 8-12 keywords
+  ogTitle: string
+  ogDescription: string
+  schemaMarkup: ArticleSchema
+}
+
+export interface ArticleSection {
+  h2: string
+  content: string            // HTML formatted paragraphs
+  h3s?: {
+    title: string
+    content: string
+  }[]
+}
+
+export interface FaqItem {
+  question: string
+  answer: string
+}
+
+export interface GeneratedArticle {
+  seo: SeoMetadata
+  article: {
+    h1: string
+    introduction: string
+    sections: ArticleSection[]
+    conclusion: string
+    faq: FaqItem[]
+  }
+  internalLinkingSuggestions: string[]
+  imageAltSuggestions: string[]
+  createdAt: string          // ISO date string
+}
+
+export interface ArticleFormData {
+  title: string
+  metaDescription: string
+  observations: string
+}
+
+export interface ArticleSchema {
+  "@context": "https://schema.org"
+  "@type": "Article"
+  headline: string
+  description: string
+  author: {
+    "@type": "Organization"
+    name: string
+  }
+  datePublished: string
+  keywords: string[]
+}
+
+
+API Route — /api/generate-article/route.ts
+·	Accept POST with ArticleFormData body
+·	Validate input (return 400 if missing required fields)
+·	Build the prompt using the builder function from /lib/prompts.ts
+·	Call Claude API with streaming enabled
+·	Stream the response back to the client as a ReadableStream using TransformStream
+·	Use claude-sonnet-4-20250514 model
+·	Set max_tokens: 8000 (full articles need room)
+·	The system prompt must instruct Claude to return ONLY valid JSON, no markdown fences, no preamble
+Streaming approach:
+·	Stream raw text chunks to the frontend for the live preview
+·	The frontend accumulates chunks and once the stream is complete, parses the full JSON
+·	If JSON parsing fails, show an error state with a retry button
+
+System Prompt (in /lib/prompts.ts)
+export const SYSTEM_PROMPT = `Eres un redactor SEO experto especializado en contenido sobre minería de criptomonedas y Bitcoin en español (España). 
+
+Tu tarea: dado un título, meta descripción y notas editoriales, generas un artículo completo, listo para publicar, optimizado para posicionamiento en Google España.
+
+REQUISITOS DEL ARTÍCULO:
+- Longitud: 1800-2500 palabras
+- Idioma: español de España (no latinoamericano)
+- Tono: profesional pero accesible, dirigido a personas interesadas en minería de Bitcoin
+- Usa la keyword principal de forma natural en: H1, primer párrafo, al menos 2 H2s, y la conclusión
+- Densidad de keywords: 1-2% (natural, nunca forzado)
+- Incluye datos actualizados de 2026 cuando sea relevante
+- Párrafos cortos (3-4 líneas máximo) para facilitar lectura web
+- Usa listas, negritas y formatos que mejoren la escaneabilidad
+
+ESTRUCTURA OBLIGATORIA:
+- Un H1 (puede ser el título optimizado o una variación)
+- Introducción enganchante (2-3 párrafos)
+- 4-6 secciones con H2 (y H3 donde sea necesario)
+- Conclusión con CTA implícito
+- Sección FAQ con 4-5 preguntas relevantes (optimizadas para featured snippets)
+
+METADATOS SEO:
+- Title tag: 55-60 caracteres
+- Meta description: 150-160 caracteres
+- 8-12 keywords relevantes (mix de short-tail y long-tail)
+- Open Graph title y description
+- JSON-LD schema markup (tipo Article)
+- Sugerencias de enlaces internos basados en el dominio ${process.env.NEXT_PUBLIC_CLIENT_DOMAIN}
+- Sugerencias de alt text para imágenes
+
+El contenido HTML debe usar etiquetas semánticas: <p>, <strong>, <ul>, <li>, <h3>.
+NO uses <h1> ni <h2> en el contenido — esos se renderizan por separado desde los campos estructurados.
+
+RESPONDE ÚNICAMENTE con un objeto JSON válido. Sin backticks, sin markdown, sin texto antes o después del JSON. Solo el JSON puro.`
+
+export function buildUserPrompt(data: ArticleFormData): string {
+  return `DATOS DEL ARTÍCULO:
+
+Título: ${data.title}
+Meta descripción: ${data.metaDescription}
+${data.observations ? `Observaciones editoriales: ${data.observations}` : ''}
+
+Genera el artículo completo con todos los metadatos SEO.`
+}
+
+
+Page Behaviors
+/admin — Generation Form
+·	Three fields: título (required), meta descripción (required), observaciones (optional textarea)
+·	"Generar y Publicar" button
+·	On submit: POST to /api/generate-article, show streaming preview in a side panel or below the form
+·	While streaming: show the raw text appearing in real time in a preview panel styled as a document
+·	On complete: parse JSON, add to Zustand store, show success state with two buttons: "Ver Artículo" (links to /preview/[slug]) and "Ver Blog" (links to /preview)
+·	On error: show error message with retry button
+/preview — Blog Listing
+·	Grid of ArticleCard components (3 cols desktop, 2 tablet, 1 mobile)
+·	Each card shows: title, excerpt (first 150 chars of intro, strip HTML), date, keyword badges (first 3)
+·	Cards link to /preview/[slug]
+·	If no articles yet, show empty state: "No hay artículos generados todavía" with CTA to /admin
+·	Pull articles from Zustand store
+/preview/[slug] — Article Page
+·	Render the full article with proper heading hierarchy
+·	Below the article: collapsible "Datos SEO" panel showing all metadata in a clean formatted view (meta tags as code blocks, keywords as badges, JSON-LD as formatted JSON)
+·	Sidebar or top bar with: "Copiar HTML", "Copiar Meta Tags", "Copiar Schema JSON-LD" buttons
+·	Use Next.js client-side rendering (since data comes from Zustand, not server)
+·	FAQ section rendered as an accordion
+
+Code Quality Rules
+1.	No any types. Everything typed. Use the interfaces from /lib/types.ts.
+2.	No hardcoded strings in components. Colors in Tailwind config/CSS vars. Text constants in /lib/constants.ts. Config in env vars.
+3.	Components are single-responsibility. A card component renders a card. It doesn't fetch data or manage state.
+4.	Server vs Client boundary is explicit. Only mark components 'use client' when they need interactivity. Layout, headers, footers can be server components if they don't depend on Zustand.
+5.	Error handling everywhere. API route validates input. Frontend handles loading, error, and empty states. Stream parsing has try/catch with fallback.
+6.	No console.log in committed code. Use proper error states in UI.
+7.	Responsive by default. Every component works on mobile. Use Tailwind responsive prefixes.
+8.	Semantic HTML.<article>, <section>, <nav>, <header>, <main>, <footer>. This is an SEO demo — the HTML structure itself is part of the pitch.
+9.	Import aliases. Use @/ path alias for all imports. No relative paths deeper than one level.
+10.	Consistent file naming. PascalCase for components, camelCase for utils/hooks/stores, kebab-case for routes.
+
+Implementation Order
+1.	Set up Next.js 16 project with TypeScript, Tailwind, path aliases
+2.	Set up design tokens (CSS variables in globals.css, matching portfolio)
+3.	Build UI primitives (/components/ui/*) — Button, Input, Textarea, Card, Badge
+4.	Build layout (Header, Footer, root layout)
+5.	Build types and constants
+6.	Build the Zustand store
+7.	Build the API route with Claude integration (test with hardcoded form data first)
+8.	Build the admin form and streaming preview
+9.	Build the blog listing page and ArticleCard
+10.	Build the article preview page with SEO metadata panel
+11.	Polish: loading states, error states, empty states, transitions
+12.	Test full flow end to end
+13.	Deploy to Vercel
+
+Dependencies to Install
+npm install zustand @anthropic-ai/sdk
+
+That's it. Keep it minimal. No UI libraries, no extra packages. Tailwind + Zustand + Anthropic SDK.
