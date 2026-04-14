@@ -2,7 +2,7 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { FiCheck } from "react-icons/fi";
+import { FiCheck, FiEye, FiEyeOff } from "react-icons/fi";
 
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
@@ -17,6 +17,7 @@ export default function LoginPage() {
 
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [rememberUser, setRememberUser] = useState(false);
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -84,13 +85,24 @@ export default function LoginPage() {
           </label>
           <label className="grid gap-2">
             <span className="text-sm text-muted-foreground">{UI_TEXT.loginPasswordLabel}</span>
-            <Input
-              required
-              autoComplete="current-password"
-              onChange={(event) => setPassword(event.target.value)}
-              type="password"
-              value={password}
-            />
+            <div className="relative">
+              <Input
+                required
+                autoComplete="current-password"
+                className="pr-12"
+                onChange={(event) => setPassword(event.target.value)}
+                type={showPassword ? "text" : "password"}
+                value={password}
+              />
+              <button
+                aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+                className="absolute inset-y-0 right-0 flex w-11 items-center justify-center text-muted-foreground transition-colors hover:text-foreground"
+                onClick={() => setShowPassword((prev) => !prev)}
+                type="button"
+              >
+                {showPassword ? <FiEyeOff className="h-4 w-4" /> : <FiEye className="h-4 w-4" />}
+              </button>
+            </div>
           </label>
           <label className="inline-flex items-center gap-3">
             <input

@@ -77,7 +77,7 @@ export const UI_TEXT = {
   regenerateButton: "Regenerar artículo",
   publishSuccessToast: "Artículo publicado correctamente.",
   duplicateTitleError: "Ya existe un artículo con este título. Cambia el título o regenera otro.",
-  generateButton: "Generar y Publicar",
+  generateButton: "Generar Articulo",
   generatingButton: "Generando...",
   retryButton: "Reintentar",
   viewArticleButton: "Ver Artículo",

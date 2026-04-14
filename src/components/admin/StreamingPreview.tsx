@@ -126,12 +126,16 @@ function runSeoChecks(article: GeneratedArticle): SeoCheckItem[] {
 
 function Tooltip({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div className="group relative">
+    <span className="group relative inline-flex" title={label}>
       {children}
-      <span className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 -translate-x-1/2 whitespace-nowrap rounded-md bg-gray-900 px-2 py-1 text-xs text-white opacity-0 shadow-lg transition-opacity duration-150 group-hover:opacity-100">
+      {/* Below the control: parent uses overflow-hidden, so top-positioned tips get clipped */}
+      <span
+        className="pointer-events-none absolute left-1/2 top-full z-[60] mt-2 -translate-x-1/2 whitespace-nowrap rounded-md bg-gray-900 px-2 py-1 text-xs text-white opacity-0 shadow-lg transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100"
+        role="tooltip"
+      >
         {label}
       </span>
-    </div>
+    </span>
   );
 }
 
@@ -160,6 +164,7 @@ export function StreamingPreview({
   const [wasImproving, setWasImproving] = useState(false);
 
   const canExport = Boolean(streamedText.trim());
+  const canUseChecklistTab = Boolean(isGenerationComplete);
 
   // Memoised highlighted JSON — only recomputes when generation completes or text changes
   const highlightedJson = useMemo(() => {
@@ -305,12 +310,18 @@ export function StreamingPreview({
             JSON Preview
           </button>
           <button
-            className={`inline-flex flex-1 items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+            className={`inline-flex flex-1 items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
               activeTab === "checklist"
                 ? "bg-card text-foreground shadow-sm"
                 : "text-muted-foreground hover:text-foreground"
             }`}
+            disabled={!canUseChecklistTab}
             onClick={() => setActiveTab("checklist")}
+            title={
+              canUseChecklistTab
+                ? undefined
+                : "Disponible cuando termine la generación del JSON"
+            }
             type="button"
           >
             SEO Checklist
@@ -329,11 +340,12 @@ export function StreamingPreview({
             <div className="relative min-h-0 flex-1 overflow-hidden rounded-lg border border-white/6">
               {/* ── Sticky icon buttons ── */}
               <div className="absolute right-2 top-2 z-10 flex gap-1.5">
-                <Tooltip label={copied ? "¡Copiado!" : "Copiar JSON"}>
+                <Tooltip label={copied ? "¡Copiado!" : "Copiar JSON al portapapeles"}>
                   <button
                     disabled={!canExport}
+                    aria-label={copied ? "JSON copiado" : "Copiar JSON al portapapeles"}
                     onClick={handleCopyJson}
-                    className="flex h-7 w-7 items-center justify-center rounded-md bg-white/10 text-gray-400 transition-colors hover:bg-white/20 hover:text-white disabled:opacity-30"
+                    className="flex h-7 w-7 items-center justify-center rounded-md bg-white/10 text-gray-400 transition-colors hover:bg-white/20 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/40 disabled:opacity-30"
                     type="button"
                   >
                     {copied ? (
@@ -343,11 +355,12 @@ export function StreamingPreview({
                     )}
                   </button>
                 </Tooltip>
-                <Tooltip label="Descargar JSON">
+                <Tooltip label="Descargar JSON como archivo">
                   <button
                     disabled={!canExport}
+                    aria-label="Descargar JSON como archivo"
                     onClick={handleDownloadJson}
-                    className="flex h-7 w-7 items-center justify-center rounded-md bg-white/10 text-gray-400 transition-colors hover:bg-white/20 hover:text-white disabled:opacity-30"
+                    className="flex h-7 w-7 items-center justify-center rounded-md bg-white/10 text-gray-400 transition-colors hover:bg-white/20 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/40 disabled:opacity-30"
                     type="button"
                   >
                     <FiDownload className="h-3.5 w-3.5" />
@@ -358,7 +371,7 @@ export function StreamingPreview({
               {/* ── JSON content ── */}
               <div
                 className="h-full overflow-y-auto overflow-x-hidden [scrollbar-color:#333_transparent] [scrollbar-width:thin] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-white/10"
-                style={{ background: "#0f1117" }}
+                style={{ background: "var(--background)" }}
               >
                 {highlightedJson ? (
                   <pre

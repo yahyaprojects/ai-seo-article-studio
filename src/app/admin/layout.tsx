@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
+import { Breadcrumb } from "@/components/admin/Breadcrumb";
 import { Sidebar } from "@/components/admin/Sidebar";
 
 const AUTH_COOKIE_NAME = "propulsa_auth";
@@ -18,7 +19,10 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     <div className="min-h-screen bg-background lg:flex lg:h-screen lg:overflow-hidden">
       <Sidebar />
       <main className="flex-1 overflow-y-auto">
-        <div className="px-4 py-6 sm:px-6 md:px-8 md:py-8">{children}</div>
+        <div className="px-4 py-6 sm:px-6 md:px-8 md:py-8">
+          <Breadcrumb />
+          {children}
+        </div>
       </main>
     </div>
   );

@@ -167,12 +167,12 @@ export function Sidebar() {
           />
         ) : (
           <Image
-            src="/assets/branding/logo.png"
+            src="/assets/branding/favicon.svg"
             alt={APP_CONFIG.brandName}
-            width={36}
-            height={36}
+            width={32}
+            height={32}
             priority
-            className="h-8 w-8 object-contain brightness-[10]"
+            className="h-8 w-8"
           />
         )}
         <button
@@ -265,7 +265,7 @@ export function Sidebar() {
   return (
     <>
       {/* ── Mobile top bar ──────────────────────────────────────────────────── */}
-      <div className="sticky top-0 z-30 flex h-14 shrink-0 items-center gap-4 border-b border-white/[0.07] bg-[#0d0d11] px-4 lg:hidden">
+      <div className="sticky top-0 z-30 flex h-14 shrink-0 items-center gap-4 border-b border-white/[0.07] bg-background px-4 lg:hidden">
         <button
           onClick={() => setMobileOpen(true)}
           className="flex h-8 w-8 items-center justify-center rounded-md text-gray-400 hover:text-white"
@@ -294,7 +294,7 @@ export function Sidebar() {
 
       {/* ── Sidebar panel ────────────────────────────────────────────────────── */}
       <aside
-        className={`fixed inset-y-0 left-0 z-50 flex flex-col border-r border-white/[0.07] bg-[#0d0d11] transition-[width,transform] duration-300 ease-in-out lg:static lg:z-auto lg:shrink-0 lg:translate-x-0 ${
+        className={`fixed inset-y-0 left-0 z-50 flex flex-col border-r border-white/[0.07] bg-background transition-[width,transform] duration-300 ease-in-out lg:static lg:z-auto lg:shrink-0 lg:translate-x-0 ${
           mobileOpen ? "w-64 translate-x-0" : "-translate-x-full lg:translate-x-0"
         } ${collapsed ? "lg:w-[4.25rem]" : "lg:w-60"} max-lg:w-64`}
       >

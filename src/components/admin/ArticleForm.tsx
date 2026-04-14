@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { ChangeEvent, FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import type { DragEvent } from "react";
-import { FiX } from "react-icons/fi";
+import { FiCheck, FiImage, FiTrash2, FiUploadCloud } from "react-icons/fi";
+import { MdAutoAwesome } from "react-icons/md";
 
 import { StreamingPreview, type SeoCheckItem } from "@/components/admin/StreamingPreview";
 import { ArticleContent } from "@/components/blog/ArticleContent";
@@ -36,9 +37,6 @@ function formatFileSize(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-function imageMimeLabel(file: File): string {
-  return file.type?.trim() ? file.type : "image/*";
-}
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -356,7 +354,7 @@ export function ArticleForm() {
     }
   }
 
-  function handleImageDragEnter(event: DragEvent<HTMLDivElement>) {
+  function handleImageDragEnter(event: DragEvent<HTMLElement>) {
     event.preventDefault();
     event.stopPropagation();
     if (event.dataTransfer.types.includes("Files")) {
@@ -364,7 +362,7 @@ export function ArticleForm() {
     }
   }
 
-  function handleImageDragLeave(event: DragEvent<HTMLDivElement>) {
+  function handleImageDragLeave(event: DragEvent<HTMLElement>) {
     event.preventDefault();
     event.stopPropagation();
     if (!event.currentTarget.contains(event.relatedTarget as Node)) {
@@ -372,13 +370,13 @@ export function ArticleForm() {
     }
   }
 
-  function handleImageDragOver(event: DragEvent<HTMLDivElement>) {
+  function handleImageDragOver(event: DragEvent<HTMLElement>) {
     event.preventDefault();
     event.stopPropagation();
     event.dataTransfer.dropEffect = "copy";
   }
 
-  function handleImageDrop(event: DragEvent<HTMLDivElement>) {
+  function handleImageDrop(event: DragEvent<HTMLElement>) {
     event.preventDefault();
     event.stopPropagation();
     setImageDragActive(false);
@@ -740,7 +738,7 @@ export function ArticleForm() {
                 {formData.observations.length}/{DEMO_LIMITS.OBSERVATIONS_MAX_LENGTH}
               </p>
             </label>
-            <label className="grid gap-2">
+            <div className="grid gap-3">
               <span className="text-sm text-muted-foreground">{UI_TEXT.fieldImage}</span>
               <input
                 id="article-featured-image-input"
@@ -750,95 +748,132 @@ export function ArticleForm() {
                 onChange={handleImageInputChange}
                 type="file"
               />
-              <div
-                className={`grid gap-3 rounded-md border border-dashed p-4 transition-colors ${
-                  imageDragActive
-                    ? "border-primary bg-primary/10"
-                    : "border-input bg-transparent hover:border-input/80"
-                }`}
-                onDragEnter={handleImageDragEnter}
-                onDragLeave={handleImageDragLeave}
-                onDragOver={handleImageDragOver}
-                onDrop={handleImageDrop}
-              >
-                <label
-                  htmlFor="article-featured-image-input"
-                  className="grid cursor-pointer gap-2 rounded-md border border-input/70 bg-background/40 p-4"
-                >
-                  <p className="text-sm text-muted-foreground">{UI_TEXT.imageDropZoneHint}</p>
-                  <p className="text-xs text-muted-foreground">PNG, JPG, WEBP - max 20MB</p>
-                  <span className="inline-flex">
-                    <span className="pointer-events-none inline-flex">
-                      <Button type="button" variant="secondary" tabIndex={-1}>
-                        {UI_TEXT.imageUploadButton}
-                      </Button>
-                    </span>
-                  </span>
-                </label>
 
-                {uploadedImageFile ? (
-                  <div className="flex gap-3 rounded-md border border-input/70 bg-background/40 p-3">
-                    <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-md border border-input bg-background">
-                      {imagePreviewUrl ? (
-                        <img
-                          alt=""
-                          className="h-full w-full object-cover"
-                          src={imagePreviewUrl}
-                        />
-                      ) : null}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-medium text-foreground">{uploadedImageFile.name}</p>
-                      <p className="mt-0.5 text-xs text-muted-foreground">
-                        {imageMimeLabel(uploadedImageFile)} · {formatFileSize(uploadedImageFile.size)}
-                      </p>
-                      <div className="mt-2 grid gap-1">
-                        <div className="flex items-center justify-between text-[11px] text-muted-foreground">
-                          <span>
-                            {imageUploadStatus === "completed"
-                              ? UI_TEXT.imageUploadCompleteLabel
-                              : UI_TEXT.imageUploadingLabel}
-                          </span>
-                          <span>{imageUploadProgress}%</span>
-                        </div>
-                        <div className="h-1.5 overflow-hidden rounded-full bg-secondary/70">
-                          <div
-                            className="h-full rounded-full bg-primary transition-all duration-150"
-                            style={{ width: `${imageUploadProgress}%` }}
-                          />
-                        </div>
+              {!uploadedImageFile ? (
+                /* ── Empty state drop zone ── */
+                <div
+                  className={`relative grid cursor-pointer place-items-center gap-3 rounded-xl border-2 border-dashed px-6 py-10 text-center transition-all duration-200 ${
+                    imageDragActive
+                      ? "border-primary bg-primary/5 scale-[1.01]"
+                      : "border-input hover:border-primary/40 hover:bg-secondary/40"
+                  }`}
+                  onClick={() => fileInputRef.current?.click()}
+                  onDragEnter={handleImageDragEnter}
+                  onDragLeave={handleImageDragLeave}
+                  onDragOver={handleImageDragOver}
+                  onDrop={handleImageDrop}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") fileInputRef.current?.click(); }}
+                >
+                  {imageDragActive ? (
+                    <>
+                      <span className="flex h-16 w-16 animate-pulse items-center justify-center rounded-full border-2 border-primary bg-primary/10">
+                        <FiUploadCloud className="h-8 w-8 text-primary" />
+                      </span>
+                      <p className="text-sm font-semibold text-primary">Drop to upload</p>
+                    </>
+                  ) : (
+                    <>
+                      <span className="flex h-12 w-12 items-center justify-center rounded-full bg-secondary">
+                        <FiUploadCloud className="h-6 w-6 text-muted-foreground" />
+                      </span>
+                      <div className="grid gap-1">
+                        <p className="text-sm text-muted-foreground">
+                          <span className="font-semibold text-primary">Click to upload</span> or drag &amp; drop
+                        </p>
+                        <p className="text-xs text-muted-foreground">PNG, JPG, WEBP · max 20 MB</p>
                       </div>
-                      <p className="mt-2 text-xs text-muted-foreground">{UI_TEXT.imageReplaceDropHint}</p>
-                      <Button
-                        className="mt-2"
-                        type="button"
-                        variant="secondary"
-                        onClick={() => fileInputRef.current?.click()}
-                      >
-                        {UI_TEXT.imageUploadButton}
-                      </Button>
-                    </div>
+                    </>
+                  )}
+                </div>
+              ) : (
+                /* ── File selected / uploading / ready state ── */
+                <div
+                  className={`relative overflow-hidden rounded-xl border-2 transition-all duration-200 ${
+                    imageDragActive ? "border-primary" : "border-input"
+                  }`}
+                  onDragEnter={handleImageDragEnter}
+                  onDragLeave={handleImageDragLeave}
+                  onDragOver={handleImageDragOver}
+                  onDrop={handleImageDrop}
+                >
+                  {/* Thumbnail */}
+                  <div className="relative aspect-[16/7] bg-secondary">
+                    {imagePreviewUrl ? (
+                      <img
+                        src={imagePreviewUrl}
+                        alt="Preview"
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      <div className="flex h-full w-full items-center justify-center">
+                        <FiImage className="h-10 w-10 text-muted-foreground/40" />
+                      </div>
+                    )}
+
+                    {/* Gradient overlay */}
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
+
+                    {/* Status badge */}
+                    {imageUploadStatus === "completed" ? (
+                      <span className="absolute left-3 top-3 flex items-center gap-1.5 rounded-full bg-emerald-500/90 px-2.5 py-1 text-xs font-medium text-white backdrop-blur-sm">
+                        <FiCheck className="h-3 w-3" /> Ready
+                      </span>
+                    ) : (
+                      <span className="absolute left-3 top-3 rounded-full bg-black/60 px-2.5 py-1 text-xs text-white/80 backdrop-blur-sm">
+                        Processing…
+                      </span>
+                    )}
+
+                    {/* Remove button */}
                     <button
                       type="button"
                       aria-label={UI_TEXT.imageRemoveFileAria}
                       title={UI_TEXT.imageRemoveFileAria}
-                      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-input text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+                      className="absolute right-3 top-3 flex h-8 w-8 items-center justify-center rounded-full bg-black/60 text-white backdrop-blur-sm transition-colors hover:bg-primary"
                       onClick={clearUploadedImage}
                     >
-                      <FiX className="h-4 w-4" />
+                      <FiTrash2 className="h-3.5 w-3.5" />
                     </button>
+
+                    {/* File info */}
+                    <div className="absolute bottom-0 left-0 right-0 flex items-center justify-between gap-3 px-3 py-2">
+                      <p className="min-w-0 truncate text-xs font-medium text-white">
+                        {uploadedImageFile.name}
+                      </p>
+                      <span className="shrink-0 text-xs text-white/60">
+                        {formatFileSize(uploadedImageFile.size)}
+                      </span>
+                    </div>
                   </div>
-                ) : (
-                  <p className="text-xs text-muted-foreground">{UI_TEXT.imageUploadEmpty}</p>
-                )}
-              </div>
-              <p className="text-xs text-muted-foreground">{UI_TEXT.imageUploadHint}</p>
-              <p className="text-right text-xs text-muted-foreground">
-                {uploadedImageFile ? UI_TEXT.imageUploadedLabel : UI_TEXT.imageAutoSearchLabel}
-              </p>
+
+                  {/* Progress bar */}
+                  <div className="h-1 w-full bg-secondary">
+                    <div
+                      className={`h-full transition-all duration-150 ease-out ${
+                        imageUploadStatus === "completed" ? "bg-emerald-500" : "bg-primary"
+                      }`}
+                      style={{ width: `${imageUploadProgress}%` }}
+                    />
+                  </div>
+
+                  {/* Drag-to-replace hint */}
+                  {imageDragActive ? (
+                    <div className="absolute inset-0 flex items-center justify-center rounded-xl bg-primary/20 backdrop-blur-[2px]">
+                      <p className="text-sm font-semibold text-primary">Drop to replace</p>
+                    </div>
+                  ) : (
+                    <p className="py-1.5 text-center text-xs text-muted-foreground">
+                      Drag another image to replace
+                    </p>
+                  )}
+                </div>
+              )}
+
               {requiresImageUpload ? (
                 <Button
-                  className="mt-2"
+                  className="mt-1"
                   disabled={!uploadedImageFile}
                   onClick={applyUploadedImageToPendingArticle}
                   type="button"
@@ -847,7 +882,7 @@ export function ArticleForm() {
                   {UI_TEXT.imageApplyButton}
                 </Button>
               ) : null}
-            </label>
+            </div>
             <Button className="inline-flex items-center justify-center gap-2" disabled={isGenerating} type="submit">
               {isGenerating ? (
                 <>
@@ -855,7 +890,10 @@ export function ArticleForm() {
                   {UI_TEXT.generatingButton}
                 </>
               ) : (
-                UI_TEXT.generateButton
+                <>
+                  <MdAutoAwesome aria-hidden className="size-5 shrink-0" />
+                  {UI_TEXT.generateButton}
+                </>
               )}
             </Button>
 

@@ -3,26 +3,28 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
+  --background: #000814;
+  --foreground: #CBD5E1;
+  --card: #010A18;
+  --card-foreground: #CBD5E1;
+  --popover: #010A18;
+  --popover-foreground: #CBD5E1;
+  --secondary: #091828;
+  --secondary-foreground: #94A3B8;
+  --muted: #091828;
+  --muted-foreground: #64748B;
+  --accent: #0F2034;
+  --accent-foreground: #CBD5E1;
+  --destructive: #e5484d;
+  --border: rgba(130, 160, 200, 0.09);
+  --input: rgba(130, 160, 200, 0.13);
+  --ring: #162C48;
   --primary: #d4301e;
-  --primary-foreground: #ffffff;
-  --hero-text: oklch(0.985 0 0);
+  --primary-foreground: #E2E8F0;
+  --hero-text: #CBD5E1;
   --radius: 0.5rem;
+  --font-size-body: 1rem;
+  --font-size-placeholder: 1rem;
 }
 
 @theme inline {
@@ -45,9 +47,10 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
-  --font-sans: var(--font-sora);
+  --font-sans: var(--font-roboto);
   --font-heading: var(--font-sora);
   --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  --text-base: var(--font-size-body);
   --radius-sm: var(--radius);
   --radius-md: var(--radius);
   --radius-lg: var(--radius);
@@ -71,5 +74,20 @@
   }
   body {
     @apply bg-background text-foreground font-sans;
+    font-size: var(--font-size-body);
+  }
+
+  p,
+  li,
+  dd,
+  dt,
+  blockquote,
+  figcaption,
+  address {
+    font-size: var(--font-size-body);
+  }
+
+  ::placeholder {
+    font-size: var(--font-size-placeholder);
   }
 }
