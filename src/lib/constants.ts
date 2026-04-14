@@ -22,6 +22,7 @@ export const DEMO_LIMITS = {
 
 export const ROUTES = {
   home: "/",
+  login: "/login",
   admin: "/admin",
   preview: "/preview",
 } as const;
@@ -30,6 +31,7 @@ export const UI_TEXT = {
   navHome: "Inicio",
   navAdmin: "Administrador",
   navPreview: "Vista Blog",
+  navLogin: "Login",
   heroEyebrow: "Demo SEO para cliente",
   heroTitle: "Generador de artículos SEO para Bitzen Mineria",
   heroDescription:
@@ -98,6 +100,12 @@ export const UI_TEXT = {
   articleNotFound: "Artículo no encontrado en memoria.",
   backToBlog: "Volver al blog",
   footerText: "Demo técnica SEO sin persistencia",
+  loginTitle: "Acceso Administrador",
+  loginDescription: "Inicia sesión para acceder al panel y a las vistas internas.",
+  loginUserLabel: "Usuario",
+  loginPasswordLabel: "Contraseña",
+  loginButton: "Entrar",
+  loginInvalid: "Credenciales inválidas.",
 } as const;
 
 export const ERROR_TEXT = {

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ChangeEvent, FormEvent, useMemo, useRef, useState } from "react";
+import { ChangeEvent, FormEvent, useEffect, useMemo, useRef, useState } from "react";
 
 import { StreamingPreview } from "@/components/admin/StreamingPreview";
 import { ArticleContent } from "@/components/blog/ArticleContent";
@@ -246,12 +246,35 @@ export function ArticleForm() {
   const [isPublished, setIsPublished] = useState(false);
   const [requiresImageUpload, setRequiresImageUpload] = useState(false);
   const [showPublishToast, setShowPublishToast] = useState(false);
+  const [formColumnHeight, setFormColumnHeight] = useState<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const formColumnRef = useRef<HTMLDivElement | null>(null);
 
   const articleUrl = useMemo(
     () => (generatedSlug ? `${ROUTES.preview}/${generatedSlug}` : ""),
     [generatedSlug],
   );
+
+  useEffect(() => {
+    const target = formColumnRef.current;
+    if (!target || typeof ResizeObserver === "undefined") {
+      return;
+    }
+
+    const updateHeight = () => {
+      setFormColumnHeight(Math.ceil(target.getBoundingClientRect().height));
+    };
+
+    updateHeight();
+    const observer = new ResizeObserver(() => {
+      updateHeight();
+    });
+    observer.observe(target);
+
+    return () => {
+      observer.disconnect();
+    };
+  }, []);
 
   const handleFieldChange =
     (field: keyof ArticleFormData) => (event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -502,9 +525,10 @@ export function ArticleForm() {
         <p className="text-base text-muted-foreground">{UI_TEXT.adminDescription}</p>
       </div>
 
-      <div className="grid items-stretch gap-6 lg:h-[calc(100vh-220px)] lg:grid-cols-2 lg:overflow-hidden">
-        <Card className="h-full min-h-0">
-          <form className="grid h-full min-h-0 gap-5 overflow-y-auto pr-1" onSubmit={handleSubmit}>
+      <div className="grid items-start gap-6 lg:grid-cols-2">
+        <div ref={formColumnRef}>
+          <Card>
+            <form className="grid gap-5" onSubmit={handleSubmit}>
             <label className="grid gap-2">
               <span className="text-sm text-muted-foreground">{UI_TEXT.fieldTitle}</span>
               <Input
@@ -603,10 +627,11 @@ export function ArticleForm() {
                 </Link>
               </div>
             ) : null}
-          </form>
-        </Card>
+            </form>
+          </Card>
+        </div>
 
-        <StreamingPreview streamedText={streamedText} />
+        <StreamingPreview containerHeight={formColumnHeight} streamedText={streamedText} />
       </div>
 
       {pendingArticle ? (
