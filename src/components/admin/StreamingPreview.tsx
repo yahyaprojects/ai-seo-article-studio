@@ -119,6 +119,20 @@ function runSeoChecks(article: GeneratedArticle): SeoCheckItem[] {
       detail: `${article.imageAltSuggestions.length} textos alt`,
       passed: article.imageAltSuggestions.length > 0,
     },
+    {
+      label: "Imagen destacada en formato WebP",
+      detail: article.featuredImage
+        ? article.featuredImage.url.startsWith("data:image/webp") ||
+          article.featuredImage.url.toLowerCase().includes(".webp")
+          ? "Formato WebP confirmado ✓"
+          : "La imagen pública no está en WebP — convertir para mejor rendimiento"
+        : "Sin imagen destacada asignada todavía",
+      passed: Boolean(
+        article.featuredImage?.url &&
+          (article.featuredImage.url.startsWith("data:image/webp") ||
+            article.featuredImage.url.toLowerCase().includes(".webp")),
+      ),
+    },
   ];
 }
 
@@ -146,6 +160,7 @@ interface StreamingPreviewProps {
   containerHeight?: number | null;
   parsedArticle?: GeneratedArticle | null;
   isGenerationComplete?: boolean;
+  generationDurationMs?: number | null;
   onImprove?: (failedChecks: SeoCheckItem[]) => void;
 }
 
@@ -154,6 +169,7 @@ export function StreamingPreview({
   containerHeight,
   parsedArticle,
   isGenerationComplete,
+  generationDurationMs,
   onImprove,
 }: StreamingPreviewProps) {
   const [copied, setCopied] = useState(false);
@@ -270,6 +286,10 @@ export function StreamingPreview({
 
   const failedChecks = visibleChecks.filter((c) => !c.passed);
   const canImprove = checksComplete && score !== null && score < 100 && Boolean(onImprove);
+  const generationDurationLabel =
+    typeof generationDurationMs === "number" && Number.isFinite(generationDurationMs)
+      ? `${(generationDurationMs / 1000).toFixed(generationDurationMs >= 10_000 ? 1 : 2)}s`
+      : null;
 
   /* ─────────────────────────────────────────────────────────────────────────
      Render
@@ -389,6 +409,10 @@ export function StreamingPreview({
                 )}
               </div>
             </div>
+
+            {isGenerationComplete && generationDurationLabel ? (
+              <p className="mt-3 text-xs text-muted-foreground">Tiempo de generación: {generationDurationLabel}</p>
+            ) : null}
 
             {/* Audit button below JSON */}
             {isGenerationComplete && parsedArticle ? (

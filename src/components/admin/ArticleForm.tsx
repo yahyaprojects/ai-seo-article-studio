@@ -236,6 +236,51 @@ function readFileAsDataUrl(file: File): Promise<string> {
   });
 }
 
+/** Convert a File or same-origin URL to a WebP data URL via canvas. */
+function convertToWebP(source: File | string): Promise<{ dataUrl: string; size: number }> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const objectUrl = source instanceof File ? URL.createObjectURL(source) : null;
+    const src = objectUrl ?? (source as string);
+
+    img.onload = () => {
+      const canvas = document.createElement("canvas");
+      canvas.width = img.naturalWidth;
+      canvas.height = img.naturalHeight;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) {
+        if (objectUrl) URL.revokeObjectURL(objectUrl);
+        reject(new Error("Canvas not supported"));
+        return;
+      }
+      ctx.drawImage(img, 0, 0);
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+
+      canvas.toBlob(
+        (blob) => {
+          if (!blob) {
+            reject(new Error("WebP conversion failed"));
+            return;
+          }
+          const reader = new FileReader();
+          reader.onload = () => resolve({ dataUrl: reader.result as string, size: blob.size });
+          reader.onerror = () => reject(new Error("Could not read blob"));
+          reader.readAsDataURL(blob);
+        },
+        "image/webp",
+        0.85,
+      );
+    };
+
+    img.onerror = () => {
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+      reject(new Error("Could not load image"));
+    };
+
+    img.src = src;
+  });
+}
+
 function isValidImageUrl(url: string): boolean {
   if (!url.trim()) {
     return false;
@@ -270,6 +315,13 @@ export function ArticleForm() {
   const [activeImageOptionIndex, setActiveImageOptionIndex] = useState(0);
   const [generationDurationMs, setGenerationDurationMs] = useState<number | null>(null);
   const [formColumnHeight, setFormColumnHeight] = useState<number | null>(null);
+  const [webpPhase, setWebpPhase] = useState<"idle" | "reading" | "converting" | "optimizing" | "done" | "error">("idle");
+  const [originalFileSize, setOriginalFileSize] = useState<number | null>(null);
+  const [convertedFileSize, setConvertedFileSize] = useState<number | null>(null);
+  const [convertedWebpUrl, setConvertedWebpUrl] = useState<string | null>(null);
+  const [isConvertingWebImages, setIsConvertingWebImages] = useState(false);
+  // Tracks which article slugs have already had their web images queued for WebP conversion
+  const processedSlugsRef = useRef<Set<string>>(new Set());
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const formColumnRef = useRef<HTMLDivElement | null>(null);
 
@@ -314,31 +366,113 @@ export function ArticleForm() {
       setImagePreviewUrl(null);
       setImageUploadProgress(0);
       setImageUploadStatus("idle");
+      setWebpPhase("idle");
+      setOriginalFileSize(null);
+      setConvertedFileSize(null);
+      setConvertedWebpUrl(null);
       return;
     }
 
-    const url = URL.createObjectURL(uploadedImageFile);
-    setImagePreviewUrl(url);
+    const objectUrl = URL.createObjectURL(uploadedImageFile);
+    setImagePreviewUrl(objectUrl);
+    setOriginalFileSize(uploadedImageFile.size);
+    setConvertedFileSize(null);
+    setConvertedWebpUrl(null);
 
-    setImageUploadProgress(0);
+    const isAlreadyWebP =
+      uploadedImageFile.type === "image/webp" ||
+      uploadedImageFile.name.toLowerCase().endsWith(".webp");
+
+    if (isAlreadyWebP) {
+      setImageUploadProgress(100);
+      setImageUploadStatus("completed");
+      setWebpPhase("done");
+      return () => URL.revokeObjectURL(objectUrl);
+    }
+
+    // Non-WebP: run phased conversion with real canvas progress
+    setImageUploadProgress(5);
     setImageUploadStatus("uploading");
-    const startedAt = Date.now();
-    const durationMs = 1200;
-    const timer = window.setInterval(() => {
-      const elapsed = Date.now() - startedAt;
-      const nextProgress = Math.min(100, Math.round((elapsed / durationMs) * 100));
-      setImageUploadProgress(nextProgress);
-      if (nextProgress >= 100) {
-        setImageUploadStatus("completed");
-        window.clearInterval(timer);
-      }
-    }, 80);
+    setWebpPhase("reading");
+
+    let cancelled = false;
+    const timers: number[] = [];
+    const t = (fn: () => void, delay: number) => {
+      const id = window.setTimeout(() => { if (!cancelled) fn(); }, delay) as unknown as number;
+      timers.push(id);
+    };
+
+    t(() => { setWebpPhase("converting"); setImageUploadProgress(28); }, 220);
+    t(() => setImageUploadProgress(52), 480);
+
+    convertToWebP(uploadedImageFile)
+      .then(({ dataUrl, size }) => {
+        if (cancelled) return;
+        setWebpPhase("optimizing");
+        setImageUploadProgress(80);
+        setConvertedWebpUrl(dataUrl);
+        setConvertedFileSize(size);
+        t(() => {
+          setImageUploadProgress(100);
+          setImageUploadStatus("completed");
+          setWebpPhase("done");
+        }, 360);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setWebpPhase("error");
+          setImageUploadProgress(100);
+          setImageUploadStatus("completed");
+        }
+      });
 
     return () => {
-      window.clearInterval(timer);
-      URL.revokeObjectURL(url);
+      cancelled = true;
+      timers.forEach((id) => window.clearTimeout(id));
+      URL.revokeObjectURL(objectUrl);
     };
   }, [uploadedImageFile]);
+
+  /**
+   * After a new article is generated, background-convert every web image option
+   * to WebP via the server proxy so the SEO checklist passes immediately.
+   * Keyed on the article slug so the effect only fires once per generation.
+   */
+  useEffect(() => {
+    if (!pendingArticle) return;
+    const slug = pendingArticle.seo.slug;
+    if (!slug || processedSlugsRef.current.has(slug)) return;
+    processedSlugsRef.current.add(slug);
+
+    const webOptions = (pendingArticle.imageOptions ?? []).filter((opt) =>
+      isValidImageUrl(opt.url) && !opt.url.startsWith("data:"),
+    );
+    if (webOptions.length === 0) return;
+
+    setIsConvertingWebImages(true);
+
+    const conversions = webOptions.map((opt) => {
+      const originalUrl = opt.url;
+      const proxyUrl = `/api/image-proxy?url=${encodeURIComponent(originalUrl)}`;
+      return convertToWebP(proxyUrl)
+        .then(({ dataUrl }) => {
+          setPendingArticle((prev) => {
+            if (!prev) return prev;
+            const newOptions = [...(prev.imageOptions ?? [])];
+            const i = newOptions.findIndex((o) => o.url === originalUrl);
+            if (i !== -1) newOptions[i] = { ...newOptions[i], url: dataUrl, source: "upload" };
+            const newFeatured =
+              prev.featuredImage?.url === originalUrl
+                ? { ...prev.featuredImage, url: dataUrl, source: "upload" as const }
+                : prev.featuredImage;
+            return { ...prev, imageOptions: newOptions, featuredImage: newFeatured };
+          });
+        })
+        .catch(() => { /* keep original URL on proxy/conversion failure */ });
+    });
+
+    void Promise.allSettled(conversions).then(() => setIsConvertingWebImages(false));
+  }, [pendingArticle?.seo.slug]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleFieldChange =
     (field: keyof ArticleFormData) => (event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -438,7 +572,8 @@ export function ArticleForm() {
     }
 
     try {
-      const imageDataUrl = await readFileAsDataUrl(uploadedImageFile);
+      // Prefer the already-converted WebP blob; fall back to raw data URL
+      const imageDataUrl = convertedWebpUrl ?? (await readFileAsDataUrl(uploadedImageFile));
       const updatedArticle: GeneratedArticle = {
         ...pendingArticle,
         featuredImage: {
@@ -483,6 +618,7 @@ export function ArticleForm() {
 
   async function generateArticle() {
     const generationStartedAt = performance.now();
+    processedSlugsRef.current.clear(); // reset so the new article's images get converted
     setError("");
     setStreamedText("");
     setGeneratedSlug("");
@@ -545,7 +681,14 @@ export function ArticleForm() {
       };
 
       if (uploadedImageFile) {
-        const imageDataUrl = await readFileAsDataUrl(uploadedImageFile);
+        // Convert to WebP at generation time so the stored URL is always WebP
+        let imageDataUrl: string;
+        try {
+          const result = await convertToWebP(uploadedImageFile);
+          imageDataUrl = result.dataUrl;
+        } catch {
+          imageDataUrl = await readFileAsDataUrl(uploadedImageFile);
+        }
         parsed = {
           ...parsed,
           featuredImage: {
@@ -835,12 +978,20 @@ export function ArticleForm() {
 
                     {/* Status badge */}
                     {imageUploadStatus === "completed" ? (
-                      <span className="absolute left-3 top-3 flex items-center gap-1.5 rounded-full bg-emerald-500/90 px-2.5 py-1 text-xs font-medium text-white backdrop-blur-sm">
-                        <FiCheck className="h-3 w-3" /> Ready
+                      <span
+                        className={`absolute left-3 top-3 flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium text-white backdrop-blur-sm ${
+                          webpPhase === "error" ? "bg-amber-500/90" : "bg-emerald-500/90"
+                        }`}
+                      >
+                        <FiCheck className="h-3 w-3" />
+                        {webpPhase === "error" ? "Original (WebP failed)" : "WebP ✓"}
                       </span>
                     ) : (
-                      <span className="absolute left-3 top-3 rounded-full bg-black/60 px-2.5 py-1 text-xs text-white/80 backdrop-blur-sm">
-                        Processing…
+                      <span className="absolute left-3 top-3 rounded-full bg-black/70 px-2.5 py-1 font-mono text-xs text-white/90 backdrop-blur-sm">
+                        {webpPhase === "reading" && "Leyendo…"}
+                        {webpPhase === "converting" && "→ WebP"}
+                        {webpPhase === "optimizing" && "Optimizando…"}
+                        {(webpPhase === "idle" || !webpPhase) && "Processing…"}
                       </span>
                     )}
 
@@ -876,10 +1027,20 @@ export function ArticleForm() {
                     />
                   </div>
 
-                  {/* Drag-to-replace hint */}
+                  {/* Drag-to-replace overlay / size-savings strip */}
                   {imageDragActive ? (
                     <div className="absolute inset-0 flex items-center justify-center rounded-xl bg-primary/20 backdrop-blur-[2px]">
                       <p className="text-sm font-semibold text-primary">Drop to replace</p>
+                    </div>
+                  ) : webpPhase === "done" && originalFileSize && convertedFileSize && convertedFileSize < originalFileSize ? (
+                    <div className="flex items-center justify-center gap-2 py-1.5 font-mono text-xs">
+                      <span className="text-muted-foreground line-through">{formatFileSize(originalFileSize)}</span>
+                      <span className="text-muted-foreground">→</span>
+                      <span className="font-semibold text-emerald-500">{formatFileSize(convertedFileSize)}</span>
+                      <span className="rounded bg-emerald-500/10 px-1 py-0.5 text-emerald-500">
+                        -{Math.round((1 - convertedFileSize / originalFileSize) * 100)}%
+                      </span>
+                      <span className="rounded bg-primary/10 px-1 py-0.5 text-primary">WebP</span>
                     </div>
                   ) : (
                     <p className="py-1.5 text-center text-xs text-muted-foreground">
@@ -958,22 +1119,41 @@ export function ArticleForm() {
                 <p className="text-sm text-muted-foreground">{UI_TEXT.imageOptionsDescription}</p>
               </div>
               <div className="grid gap-3 rounded-xl border border-border bg-card p-3">
+                {/* WebP conversion progress banner */}
+                {isConvertingWebImages && (
+                  <div className="flex items-center gap-2 rounded-lg border border-primary/20 bg-primary/5 px-3 py-2 text-xs text-primary">
+                    <span className="h-2 w-2 animate-pulse rounded-full bg-primary" />
+                    <span className="font-mono">Convirtiendo imágenes a WebP…</span>
+                  </div>
+                )}
                 <div className="relative overflow-hidden rounded-lg border border-border">
                   <div
                     className="flex transition-transform duration-300 ease-out"
                     style={{ transform: `translateX(-${activeImageOptionIndex * 100}%)` }}
                   >
                     {pendingArticle.imageOptions?.map((option, index) => {
+                      // Use index as key so remounting doesn't occur when url changes to data URL
                       const isSelected = pendingArticle.featuredImage?.url === option.url;
                       const isActiveSlide = index === activeImageOptionIndex;
+                      const isWebP =
+                        option.url.startsWith("data:image/webp") ||
+                        option.url.toLowerCase().includes(".webp");
                       return (
-                        <div key={option.url} className="group relative w-full shrink-0">
-                          <img
-                            alt={option.alt || pendingArticle.seo.title}
-                            className="h-52 w-full object-cover"
-                            src={option.url}
-                          />
+                        <div key={index} className="group relative w-full shrink-0">
+                          <div className="flex h-80 w-full items-center justify-center bg-secondary/50 md:h-[26rem] lg:h-[30rem]">
+                            <img
+                              alt={option.alt || pendingArticle.seo.title}
+                              className="max-h-full w-full object-contain object-center"
+                              src={option.url}
+                            />
+                          </div>
                           <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent opacity-0 transition-opacity duration-200 group-hover:opacity-100" />
+                          {/* WebP badge */}
+                          {isWebP && (
+                            <span className="absolute right-3 top-3 rounded bg-emerald-500/90 px-1.5 py-0.5 font-mono text-xs font-semibold text-white backdrop-blur-sm">
+                              WebP ✓
+                            </span>
+                          )}
                           <div className="absolute inset-x-3 bottom-3 flex items-center justify-between gap-2">
                             <Button
                               className={`transition-opacity duration-200 ${isActiveSlide ? "opacity-0 group-hover:opacity-100" : "pointer-events-none opacity-0"}`}

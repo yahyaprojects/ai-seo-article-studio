@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { FiArrowRight, FiCalendar, FiFileText, FiTag, FiZap } from "react-icons/fi";
+import { FiArrowRight, FiCalendar, FiFileText, FiPlus, FiTag } from "react-icons/fi";
 
 import { Button } from "@/components/ui/Button";
 import { ROUTES } from "@/lib/constants";
@@ -33,7 +33,7 @@ export default function AdminArticlesPage() {
           </p>
           <Link href={ROUTES.admin} className="mt-6">
             <Button className="inline-flex items-center gap-2">
-              <FiZap className="h-4 w-4" />
+              <FiPlus className="h-4 w-4" />
               Generar artículo
             </Button>
           </Link>
@@ -54,7 +54,7 @@ export default function AdminArticlesPage() {
         </div>
         <Link href={ROUTES.admin}>
           <Button className="inline-flex items-center gap-2">
-            <FiZap className="h-4 w-4" />
+            <FiPlus className="h-4 w-4" />
             Nuevo artículo
           </Button>
         </Link>
