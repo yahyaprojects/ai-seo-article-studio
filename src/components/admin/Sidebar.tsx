@@ -199,25 +199,6 @@ export function Sidebar() {
           ))}
         </ul>
 
-        {!collapsed && articleCount > 0 && (
-          <div className="mt-6 rounded-lg border border-white/[0.07] bg-white/[0.03] p-3">
-            <p className="text-[11px] font-medium text-gray-500">Esta sesión</p>
-            <p className="mt-0.5 text-lg font-semibold text-white">
-              {articleCount}
-              <span className="ml-1 text-sm font-normal text-gray-400">
-                {articleCount === 1 ? "artículo" : "artículos"}
-              </span>
-            </p>
-          </div>
-        )}
-        {collapsed && articleCount > 0 && (
-          <div
-            className="mx-auto mt-4 flex h-9 w-9 items-center justify-center rounded-lg border border-white/[0.07] bg-white/[0.03] text-xs font-semibold text-primary"
-            title={`${articleCount} en esta sesión`}
-          >
-            {articleCount > 9 ? "9+" : articleCount}
-          </div>
-        )}
       </nav>
 
       {/* User + logout */}

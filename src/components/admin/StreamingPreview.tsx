@@ -126,11 +126,11 @@ function runSeoChecks(article: GeneratedArticle): SeoCheckItem[] {
 
 function Tooltip({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <span className="group relative inline-flex" title={label}>
+    <span className="group relative inline-flex">
       {children}
       {/* Below the control: parent uses overflow-hidden, so top-positioned tips get clipped */}
       <span
-        className="pointer-events-none absolute left-1/2 top-full z-[60] mt-2 -translate-x-1/2 whitespace-nowrap rounded-md bg-gray-900 px-2 py-1 text-xs text-white opacity-0 shadow-lg transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100"
+        className="pointer-events-none absolute right-0 top-full z-[2147483647] mt-2 whitespace-nowrap rounded-md bg-gray-900 px-2 py-1 text-xs text-white opacity-0 shadow-lg transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100"
         role="tooltip"
       >
         {label}
@@ -340,10 +340,10 @@ export function StreamingPreview({
             <div className="relative min-h-0 flex-1 overflow-hidden rounded-lg border border-white/6">
               {/* ── Sticky icon buttons ── */}
               <div className="absolute right-2 top-2 z-10 flex gap-1.5">
-                <Tooltip label={copied ? "¡Copiado!" : "Copiar JSON al portapapeles"}>
+                <Tooltip label={copied ? "Copiado" : "Copiar"}>
                   <button
                     disabled={!canExport}
-                    aria-label={copied ? "JSON copiado" : "Copiar JSON al portapapeles"}
+                    aria-label={copied ? "Copiado" : "Copiar"}
                     onClick={handleCopyJson}
                     className="flex h-7 w-7 items-center justify-center rounded-md bg-white/10 text-gray-400 transition-colors hover:bg-white/20 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/40 disabled:opacity-30"
                     type="button"
@@ -355,10 +355,10 @@ export function StreamingPreview({
                     )}
                   </button>
                 </Tooltip>
-                <Tooltip label="Descargar JSON como archivo">
+                <Tooltip label="Descargar">
                   <button
                     disabled={!canExport}
-                    aria-label="Descargar JSON como archivo"
+                    aria-label="Descargar"
                     onClick={handleDownloadJson}
                     className="flex h-7 w-7 items-center justify-center rounded-md bg-white/10 text-gray-400 transition-colors hover:bg-white/20 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/40 disabled:opacity-30"
                     type="button"

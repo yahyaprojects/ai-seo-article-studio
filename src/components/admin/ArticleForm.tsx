@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { ChangeEvent, FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import type { DragEvent } from "react";
-import { FiCheck, FiImage, FiTrash2, FiUploadCloud } from "react-icons/fi";
+import { FiCheck, FiChevronLeft, FiChevronRight, FiImage, FiTrash2, FiUploadCloud } from "react-icons/fi";
 import { MdAutoAwesome } from "react-icons/md";
 
 import { StreamingPreview, type SeoCheckItem } from "@/components/admin/StreamingPreview";
@@ -267,6 +267,8 @@ export function ArticleForm() {
   const [isPublished, setIsPublished] = useState(false);
   const [requiresImageUpload, setRequiresImageUpload] = useState(false);
   const [showPublishToast, setShowPublishToast] = useState(false);
+  const [activeImageOptionIndex, setActiveImageOptionIndex] = useState(0);
+  const [generationDurationMs, setGenerationDurationMs] = useState<number | null>(null);
   const [formColumnHeight, setFormColumnHeight] = useState<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const formColumnRef = useRef<HTMLDivElement | null>(null);
@@ -296,6 +298,16 @@ export function ArticleForm() {
       observer.disconnect();
     };
   }, []);
+
+  const imageOptionsCount = pendingArticle?.imageOptions?.length ?? 0;
+
+  useEffect(() => {
+    if (!imageOptionsCount) {
+      setActiveImageOptionIndex(0);
+      return;
+    }
+    setActiveImageOptionIndex((current) => Math.min(current, imageOptionsCount - 1));
+  }, [imageOptionsCount]);
 
   useEffect(() => {
     if (!uploadedImageFile) {
@@ -470,6 +482,7 @@ export function ArticleForm() {
   }
 
   async function generateArticle() {
+    const generationStartedAt = performance.now();
     setError("");
     setStreamedText("");
     setGeneratedSlug("");
@@ -477,6 +490,7 @@ export function ArticleForm() {
     setIsPublished(false);
     setRequiresImageUpload(false);
     setShowPublishToast(false);
+    setGenerationDurationMs(null);
 
     if (!formData.title.trim() || !formData.metaDescription.trim()) {
       setError(ERROR_TEXT.requiredFields);
@@ -595,6 +609,7 @@ export function ArticleForm() {
       }
     } finally {
       setIsGenerating(false);
+      setGenerationDurationMs(Math.max(0, Math.round(performance.now() - generationStartedAt)));
     }
   }
 
@@ -629,9 +644,11 @@ export function ArticleForm() {
   async function handleImproveSeo(failedChecks: SeoCheckItem[]) {
     if (!pendingArticle || failedChecks.length === 0) return;
 
+    const generationStartedAt = performance.now();
     setError("");
     setStreamedText("");
     setIsGenerating(true);
+    setGenerationDurationMs(null);
 
     try {
       const response = await fetch("/api/improve-article", {
@@ -680,6 +697,7 @@ export function ArticleForm() {
       setError(ERROR_TEXT.generationFailed);
     } finally {
       setIsGenerating(false);
+      setGenerationDurationMs(Math.max(0, Math.round(performance.now() - generationStartedAt)));
     }
   }
 
@@ -917,6 +935,7 @@ export function ArticleForm() {
           streamedText={streamedText}
           parsedArticle={pendingArticle}
           isGenerationComplete={!isGenerating && Boolean(streamedText)}
+          generationDurationMs={generationDurationMs}
           onImprove={handleImproveSeo}
         />
       </div>
@@ -938,25 +957,89 @@ export function ArticleForm() {
                 <h3 className="font-heading text-xl font-semibold text-foreground">{UI_TEXT.imageOptionsTitle}</h3>
                 <p className="text-sm text-muted-foreground">{UI_TEXT.imageOptionsDescription}</p>
               </div>
-              <div className="grid gap-4 md:grid-cols-2">
-                {pendingArticle.imageOptions?.map((option) => {
-                  const isSelected = pendingArticle.featuredImage?.url === option.url;
-                  return (
-                    <div key={option.url} className="grid gap-2 rounded-md border border-border p-3">
-                      <img
-                        alt={option.alt || pendingArticle.seo.title}
-                        className="h-36 w-full rounded-md border border-border object-cover"
-                        src={option.url}
+              <div className="grid gap-3 rounded-xl border border-border bg-card p-3">
+                <div className="relative overflow-hidden rounded-lg border border-border">
+                  <div
+                    className="flex transition-transform duration-300 ease-out"
+                    style={{ transform: `translateX(-${activeImageOptionIndex * 100}%)` }}
+                  >
+                    {pendingArticle.imageOptions?.map((option, index) => {
+                      const isSelected = pendingArticle.featuredImage?.url === option.url;
+                      const isActiveSlide = index === activeImageOptionIndex;
+                      return (
+                        <div key={option.url} className="group relative w-full shrink-0">
+                          <img
+                            alt={option.alt || pendingArticle.seo.title}
+                            className="h-52 w-full object-cover"
+                            src={option.url}
+                          />
+                          <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent opacity-0 transition-opacity duration-200 group-hover:opacity-100" />
+                          <div className="absolute inset-x-3 bottom-3 flex items-center justify-between gap-2">
+                            <Button
+                              className={`transition-opacity duration-200 ${isActiveSlide ? "opacity-0 group-hover:opacity-100" : "pointer-events-none opacity-0"}`}
+                              disabled={!isActiveSlide}
+                              onClick={() => applyClaudeImageOption(option)}
+                              type="button"
+                              variant="secondary"
+                            >
+                              Seleccionar imagen
+                            </Button>
+                            {isSelected ? (
+                              <span className="rounded-full bg-primary px-2.5 py-1 text-xs font-medium text-white">
+                                {UI_TEXT.imageSelectedLabel}
+                              </span>
+                            ) : null}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {imageOptionsCount > 1 ? (
+                    <>
+                      <button
+                        aria-label="Imagen anterior"
+                        className="absolute left-3 top-1/2 inline-flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-black/55 text-white backdrop-blur-sm transition-colors hover:bg-black/70"
+                        onClick={() =>
+                          setActiveImageOptionIndex((current) =>
+                            current === 0 ? imageOptionsCount - 1 : current - 1,
+                          )
+                        }
+                        type="button"
+                      >
+                        <FiChevronLeft className="h-4 w-4" />
+                      </button>
+                      <button
+                        aria-label="Imagen siguiente"
+                        className="absolute right-3 top-1/2 inline-flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-black/55 text-white backdrop-blur-sm transition-colors hover:bg-black/70"
+                        onClick={() =>
+                          setActiveImageOptionIndex((current) =>
+                            current === imageOptionsCount - 1 ? 0 : current + 1,
+                          )
+                        }
+                        type="button"
+                      >
+                        <FiChevronRight className="h-4 w-4" />
+                      </button>
+                    </>
+                  ) : null}
+                </div>
+
+                {imageOptionsCount > 1 ? (
+                  <div className="flex items-center justify-center gap-2">
+                    {pendingArticle.imageOptions?.map((option, index) => (
+                      <button
+                        key={option.url}
+                        aria-label={`Ver imagen ${index + 1}`}
+                        className={`h-2.5 w-2.5 rounded-full transition-colors ${
+                          index === activeImageOptionIndex ? "bg-primary" : "bg-border hover:bg-muted-foreground"
+                        }`}
+                        onClick={() => setActiveImageOptionIndex(index)}
+                        type="button"
                       />
-                      <div className="flex items-center justify-between gap-2">
-                        <Button onClick={() => applyClaudeImageOption(option)} type="button" variant="secondary">
-                          {UI_TEXT.imageUseOptionButton}
-                        </Button>
-                        {isSelected ? <span className="text-xs text-muted-foreground">{UI_TEXT.imageSelectedLabel}</span> : null}
-                      </div>
-                    </div>
-                  );
-                })}
+                    ))}
+                  </div>
+                ) : null}
               </div>
             </div>
           ) : null}
