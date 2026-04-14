@@ -46,15 +46,24 @@ export function HeaderClient({ appName, isAuthenticated, uiText }: HeaderClientP
     };
   }, [isHome]);
 
+  const isActive = (href: string) => {
+    if (href === ROUTES.home) {
+      return pathname === ROUTES.home;
+    }
+    return pathname.startsWith(href);
+  };
+
   const shouldStick = !isHome || hasPassedHero;
   const headerClassName = shouldStick
-    ? "sticky top-0 z-50 bg-black/20 backdrop-blur-xl transition-all duration-200"
+    ? "sticky top-0 z-50 bg-black/55 backdrop-blur-xl transition-all duration-200"
     : "absolute left-0 right-0 top-0 z-50 bg-transparent transition-all duration-200";
-  const logoClassName = shouldStick ? "h-9 w-auto" : "h-9 w-auto";
-  const navTextClassName = shouldStick ? "text-muted-foreground" : "text-white/85";
-  const linkClassName = shouldStick
-    ? "rounded-md px-3 py-2 text-sm text-foreground hover:bg-secondary"
-    : "rounded-md px-3 py-2 text-sm text-white/90 hover:bg-white/10";
+  const logoClassName = "h-9 w-auto";
+  const navTextClassName = "text-white/85";
+  const getLinkClassName = (href: string) =>
+    [
+      "rounded-md px-3 py-2 text-sm transition-all duration-150",
+      isActive(href) ? "bg-primary text-white" : "text-white/90 hover:bg-white/10",
+    ].join(" ");
 
   return (
     <header className={headerClassName}>
@@ -71,20 +80,20 @@ export function HeaderClient({ appName, isAuthenticated, uiText }: HeaderClientP
           <span className="sr-only">{appName}</span>
         </Link>
         <div className={`flex items-center gap-3 ${navTextClassName}`}>
-          <Link className={linkClassName} href={ROUTES.home}>
+          <Link className={getLinkClassName(ROUTES.home)} href={ROUTES.home}>
             {uiText.navHome}
           </Link>
           {isAuthenticated ? (
             <>
-              <Link className={linkClassName} href={ROUTES.admin}>
+              <Link className={getLinkClassName(ROUTES.admin)} href={ROUTES.admin}>
                 {uiText.navAdmin}
               </Link>
-              <Link className={linkClassName} href={ROUTES.preview}>
+              <Link className={getLinkClassName(ROUTES.preview)} href={ROUTES.preview}>
                 {uiText.navPreview}
               </Link>
             </>
           ) : (
-            <Link className={linkClassName} href={ROUTES.login}>
+            <Link className={getLinkClassName(ROUTES.login)} href={ROUTES.login}>
               {uiText.navLogin}
             </Link>
           )}

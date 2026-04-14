@@ -645,7 +645,12 @@ export function ArticleForm() {
           </Card>
         </div>
 
-        <StreamingPreview containerHeight={formColumnHeight} streamedText={streamedText} />
+        <StreamingPreview
+          containerHeight={formColumnHeight}
+          streamedText={streamedText}
+          parsedArticle={pendingArticle}
+          isGenerationComplete={!isGenerating && Boolean(streamedText)}
+        />
       </div>
 
       {pendingArticle ? (

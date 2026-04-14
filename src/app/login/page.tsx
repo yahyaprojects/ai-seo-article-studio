@@ -2,11 +2,14 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { FiCheck } from "react-icons/fi";
 
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
 import { UI_TEXT } from "@/lib/constants";
+
+const REMEMBERED_USERNAME_KEY = "seo-demo:remembered-username";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -14,12 +17,19 @@ export default function LoginPage() {
 
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [rememberUser, setRememberUser] = useState(false);
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     setNextPath(params.get("next") || "/admin");
+
+    const rememberedUsername = window.localStorage.getItem(REMEMBERED_USERNAME_KEY);
+    if (rememberedUsername) {
+      setUsername(rememberedUsername);
+      setRememberUser(true);
+    }
   }, []);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -37,6 +47,12 @@ export default function LoginPage() {
       if (!response.ok) {
         setError(UI_TEXT.loginInvalid);
         return;
+      }
+
+      if (rememberUser && username.trim()) {
+        window.localStorage.setItem(REMEMBERED_USERNAME_KEY, username.trim());
+      } else {
+        window.localStorage.removeItem(REMEMBERED_USERNAME_KEY);
       }
 
       router.push(nextPath);
@@ -75,6 +91,24 @@ export default function LoginPage() {
               type="password"
               value={password}
             />
+          </label>
+          <label className="inline-flex items-center gap-3">
+            <input
+              checked={rememberUser}
+              className="sr-only"
+              onChange={(event) => setRememberUser(event.target.checked)}
+              type="checkbox"
+            />
+            <span
+              className={`flex h-5 w-5 items-center justify-center rounded-sm border transition-all duration-150 ${
+                rememberUser
+                  ? "border-primary bg-primary text-primary-foreground"
+                  : "border-input bg-transparent text-transparent"
+              }`}
+            >
+              <FiCheck className="h-3.5 w-3.5" />
+            </span>
+            <span className="text-sm text-muted-foreground">{UI_TEXT.loginRememberUserLabel}</span>
           </label>
           <Button disabled={isLoading} type="submit">
             {isLoading ? `${UI_TEXT.loginButton}...` : UI_TEXT.loginButton}

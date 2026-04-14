@@ -104,6 +104,7 @@ export const UI_TEXT = {
   loginDescription: "Inicia sesión para acceder al panel y a las vistas internas.",
   loginUserLabel: "Usuario",
   loginPasswordLabel: "Contraseña",
+  loginRememberUserLabel: "Recordar usuario",
   loginButton: "Entrar",
   loginInvalid: "Credenciales inválidas.",
 } as const;
