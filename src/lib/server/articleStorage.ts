@@ -13,7 +13,9 @@ export interface StoredArticleRecord {
   updatedAt: string;
 }
 
-const articleDirectoryPath = path.join(process.cwd(), STORAGE_CONFIG.articlesDirectory);
+const articleDirectoryPath = process.env.VERCEL
+  ? path.join("/tmp", STORAGE_CONFIG.articlesDirectory)
+  : path.join(process.cwd(), STORAGE_CONFIG.articlesDirectory);
 
 export async function ensureArticleDirectory() {
   await mkdir(articleDirectoryPath, { recursive: true });

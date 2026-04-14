@@ -417,7 +417,12 @@ export function ArticleForm() {
         setStreamedText(fullText);
       }
 
-      let parsed = parseGeneratedArticleJson(fullText, formData);
+      let parsed: GeneratedArticle;
+      try {
+        parsed = parseGeneratedArticleJson(fullText, formData);
+      } catch {
+        throw new Error(ERROR_TEXT.invalidJson);
+      }
       const fallbackSlug = createSlug(parsed.seo.slug || parsed.seo.title || formData.title);
 
       parsed = {
@@ -475,11 +480,20 @@ export function ArticleForm() {
         setRequiresImageUpload(false);
       }
 
-      await saveArticle(parsed, "draft");
+      try {
+        await saveArticle(parsed, "draft");
+      } catch (saveError) {
+        console.error("Draft save failed", saveError);
+        setError(ERROR_TEXT.saveFailed);
+      }
       setPendingArticle(parsed);
       setRequiresImageUpload(false);
-    } catch {
-      setError(UI_TEXT.streamPreviewError);
+    } catch (generationError) {
+      if (generationError instanceof Error && generationError.message === ERROR_TEXT.invalidJson) {
+        setError(ERROR_TEXT.invalidJson);
+      } else {
+        setError(ERROR_TEXT.generationFailed);
+      }
     } finally {
       setIsGenerating(false);
     }
