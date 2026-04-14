@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import { ChangeEvent, FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import type { DragEvent } from "react";
+import { FiX } from "react-icons/fi";
 
 import { StreamingPreview, type SeoCheckItem } from "@/components/admin/StreamingPreview";
 import { ArticleContent } from "@/components/blog/ArticleContent";
@@ -20,6 +22,23 @@ const initialFormData: ArticleFormData = {
   metaDescription: "",
   observations: "",
 };
+
+function formatFileSize(bytes: number): string {
+  if (!Number.isFinite(bytes) || bytes < 0) {
+    return "—";
+  }
+  if (bytes < 1024) {
+    return `${bytes} B`;
+  }
+  if (bytes < 1024 * 1024) {
+    return `${(bytes / 1024).toFixed(1)} KB`;
+  }
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function imageMimeLabel(file: File): string {
+  return file.type?.trim() ? file.type : "image/*";
+}
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -242,6 +261,10 @@ export function ArticleForm() {
   const [error, setError] = useState("");
   const [generatedSlug, setGeneratedSlug] = useState("");
   const [uploadedImageFile, setUploadedImageFile] = useState<File | null>(null);
+  const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
+  const [imageDragActive, setImageDragActive] = useState(false);
+  const [imageUploadProgress, setImageUploadProgress] = useState(0);
+  const [imageUploadStatus, setImageUploadStatus] = useState<"idle" | "uploading" | "completed">("idle");
   const [pendingArticle, setPendingArticle] = useState<GeneratedArticle | null>(null);
   const [isPublished, setIsPublished] = useState(false);
   const [requiresImageUpload, setRequiresImageUpload] = useState(false);
@@ -276,16 +299,94 @@ export function ArticleForm() {
     };
   }, []);
 
+  useEffect(() => {
+    if (!uploadedImageFile) {
+      setImagePreviewUrl(null);
+      setImageUploadProgress(0);
+      setImageUploadStatus("idle");
+      return;
+    }
+
+    const url = URL.createObjectURL(uploadedImageFile);
+    setImagePreviewUrl(url);
+
+    setImageUploadProgress(0);
+    setImageUploadStatus("uploading");
+    const startedAt = Date.now();
+    const durationMs = 1200;
+    const timer = window.setInterval(() => {
+      const elapsed = Date.now() - startedAt;
+      const nextProgress = Math.min(100, Math.round((elapsed / durationMs) * 100));
+      setImageUploadProgress(nextProgress);
+      if (nextProgress >= 100) {
+        setImageUploadStatus("completed");
+        window.clearInterval(timer);
+      }
+    }, 80);
+
+    return () => {
+      window.clearInterval(timer);
+      URL.revokeObjectURL(url);
+    };
+  }, [uploadedImageFile]);
+
   const handleFieldChange =
     (field: keyof ArticleFormData) => (event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
       const value = event.target.value;
       setFormData((prev) => ({ ...prev, [field]: value }));
     };
 
-  const handleImageChange = (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0] ?? null;
+  function pickImageFile(file: File | undefined | null) {
+    if (!file || !file.type.startsWith("image/")) {
+      return;
+    }
     setUploadedImageFile(file);
-  };
+  }
+
+  const handleImageInputChange = (event: ChangeEvent<HTMLInputElement>) => {
+    pickImageFile(event.target.files?.[0]);
+  }
+
+  function clearUploadedImage() {
+    setUploadedImageFile(null);
+    setImageUploadProgress(0);
+    setImageUploadStatus("idle");
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  }
+
+  function handleImageDragEnter(event: DragEvent<HTMLDivElement>) {
+    event.preventDefault();
+    event.stopPropagation();
+    if (event.dataTransfer.types.includes("Files")) {
+      setImageDragActive(true);
+    }
+  }
+
+  function handleImageDragLeave(event: DragEvent<HTMLDivElement>) {
+    event.preventDefault();
+    event.stopPropagation();
+    if (!event.currentTarget.contains(event.relatedTarget as Node)) {
+      setImageDragActive(false);
+    }
+  }
+
+  function handleImageDragOver(event: DragEvent<HTMLDivElement>) {
+    event.preventDefault();
+    event.stopPropagation();
+    event.dataTransfer.dropEffect = "copy";
+  }
+
+  function handleImageDrop(event: DragEvent<HTMLDivElement>) {
+    event.preventDefault();
+    event.stopPropagation();
+    setImageDragActive(false);
+    const dropped = Array.from(event.dataTransfer.files).find((f) => f.type.startsWith("image/"));
+    if (dropped) {
+      pickImageFile(dropped);
+    }
+  }
 
   async function checkTitleExists(title: string) {
     const normalized = title.trim().toLowerCase();
@@ -642,23 +743,94 @@ export function ArticleForm() {
             <label className="grid gap-2">
               <span className="text-sm text-muted-foreground">{UI_TEXT.fieldImage}</span>
               <input
+                id="article-featured-image-input"
                 ref={fileInputRef}
                 accept="image/*"
-                className="hidden"
-                onChange={handleImageChange}
+                className="sr-only"
+                onChange={handleImageInputChange}
                 type="file"
               />
-              <div className="grid gap-2 rounded-md border border-input bg-transparent p-4">
-                <Button
-                  onClick={() => fileInputRef.current?.click()}
-                  type="button"
-                  variant="secondary"
+              <div
+                className={`grid gap-3 rounded-md border border-dashed p-4 transition-colors ${
+                  imageDragActive
+                    ? "border-primary bg-primary/10"
+                    : "border-input bg-transparent hover:border-input/80"
+                }`}
+                onDragEnter={handleImageDragEnter}
+                onDragLeave={handleImageDragLeave}
+                onDragOver={handleImageDragOver}
+                onDrop={handleImageDrop}
+              >
+                <label
+                  htmlFor="article-featured-image-input"
+                  className="grid cursor-pointer gap-2 rounded-md border border-input/70 bg-background/40 p-4"
                 >
-                  {UI_TEXT.imageUploadButton}
-                </Button>
-                <p className="text-sm text-muted-foreground">
-                  {uploadedImageFile ? uploadedImageFile.name : UI_TEXT.imageUploadEmpty}
-                </p>
+                  <p className="text-sm text-muted-foreground">{UI_TEXT.imageDropZoneHint}</p>
+                  <p className="text-xs text-muted-foreground">PNG, JPG, WEBP - max 20MB</p>
+                  <span className="inline-flex">
+                    <span className="pointer-events-none inline-flex">
+                      <Button type="button" variant="secondary" tabIndex={-1}>
+                        {UI_TEXT.imageUploadButton}
+                      </Button>
+                    </span>
+                  </span>
+                </label>
+
+                {uploadedImageFile ? (
+                  <div className="flex gap-3 rounded-md border border-input/70 bg-background/40 p-3">
+                    <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-md border border-input bg-background">
+                      {imagePreviewUrl ? (
+                        <img
+                          alt=""
+                          className="h-full w-full object-cover"
+                          src={imagePreviewUrl}
+                        />
+                      ) : null}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-medium text-foreground">{uploadedImageFile.name}</p>
+                      <p className="mt-0.5 text-xs text-muted-foreground">
+                        {imageMimeLabel(uploadedImageFile)} · {formatFileSize(uploadedImageFile.size)}
+                      </p>
+                      <div className="mt-2 grid gap-1">
+                        <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+                          <span>
+                            {imageUploadStatus === "completed"
+                              ? UI_TEXT.imageUploadCompleteLabel
+                              : UI_TEXT.imageUploadingLabel}
+                          </span>
+                          <span>{imageUploadProgress}%</span>
+                        </div>
+                        <div className="h-1.5 overflow-hidden rounded-full bg-secondary/70">
+                          <div
+                            className="h-full rounded-full bg-primary transition-all duration-150"
+                            style={{ width: `${imageUploadProgress}%` }}
+                          />
+                        </div>
+                      </div>
+                      <p className="mt-2 text-xs text-muted-foreground">{UI_TEXT.imageReplaceDropHint}</p>
+                      <Button
+                        className="mt-2"
+                        type="button"
+                        variant="secondary"
+                        onClick={() => fileInputRef.current?.click()}
+                      >
+                        {UI_TEXT.imageUploadButton}
+                      </Button>
+                    </div>
+                    <button
+                      type="button"
+                      aria-label={UI_TEXT.imageRemoveFileAria}
+                      title={UI_TEXT.imageRemoveFileAria}
+                      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-input text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+                      onClick={clearUploadedImage}
+                    >
+                      <FiX className="h-4 w-4" />
+                    </button>
+                  </div>
+                ) : (
+                  <p className="text-xs text-muted-foreground">{UI_TEXT.imageUploadEmpty}</p>
+                )}
               </div>
               <p className="text-xs text-muted-foreground">{UI_TEXT.imageUploadHint}</p>
               <p className="text-right text-xs text-muted-foreground">

@@ -30,7 +30,6 @@ export const ROUTES = {
 export const UI_TEXT = {
   navHome: "Inicio",
   navAdmin: "Administrador",
-  navPreview: "Vista Blog",
   navLogin: "Login",
   heroEyebrow: "Demo SEO para cliente",
   heroTitle: "Generador de artículos SEO para Bitzen Mineria",
@@ -57,6 +56,11 @@ export const UI_TEXT = {
   imageUploadRequiredError:
     "Claude no devolvió una URL de imagen válida. Sube una imagen para continuar.",
   imageUploadButton: "Seleccionar imagen",
+  imageDropZoneHint: "Arrastra y suelta una imagen aquí, o haz clic para elegir",
+  imageReplaceDropHint: "Suelta otra imagen para reemplazar la actual",
+  imageUploadingLabel: "Subiendo imagen...",
+  imageUploadCompleteLabel: "Subida completada",
+  imageRemoveFileAria: "Quitar imagen",
   imageUploadEmpty: "Ningún archivo seleccionado",
   imageApplyButton: "Usar imagen subida en el preview",
   imageOptionsTitle: "Elige imagen destacada",

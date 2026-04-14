@@ -13,7 +13,6 @@ type HeaderClientProps = {
   uiText: {
     navHome: string;
     navAdmin: string;
-    navPreview: string;
     navLogin: string;
   };
 };
@@ -84,14 +83,9 @@ export function HeaderClient({ appName, isAuthenticated, uiText }: HeaderClientP
             {uiText.navHome}
           </Link>
           {isAuthenticated ? (
-            <>
-              <Link className={getLinkClassName(ROUTES.admin)} href={ROUTES.admin}>
-                {uiText.navAdmin}
-              </Link>
-              <Link className={getLinkClassName(ROUTES.preview)} href={ROUTES.preview}>
-                {uiText.navPreview}
-              </Link>
-            </>
+            <Link className={getLinkClassName(ROUTES.admin)} href={ROUTES.admin}>
+              {uiText.navAdmin}
+            </Link>
           ) : (
             <Link className={getLinkClassName(ROUTES.login)} href={ROUTES.login}>
               {uiText.navLogin}
