@@ -5,6 +5,8 @@ import { APP_CONFIG, DEMO_LIMITS, ERROR_TEXT } from "@/lib/constants";
 import { buildUserPrompt, SYSTEM_PROMPT } from "@/lib/prompts";
 import type { ArticleFormData } from "@/lib/types";
 
+export const maxDuration = 60;
+
 function isValidPayload(value: Partial<ArticleFormData>): value is ArticleFormData {
   return Boolean(value.title?.trim()) && Boolean(value.metaDescription?.trim());
 }
@@ -46,13 +48,14 @@ export async function POST(request: Request) {
       async start(controller) {
         try {
           for await (const event of stream) {
-            if (event.type === "content_block_delta" && event.delta.type === "text_delta") {
+            if (event.type === "content_block_delta" && event.delta?.type === "text_delta") {
               controller.enqueue(encoder.encode(event.delta.text));
             }
           }
           controller.close();
-        } catch {
-          controller.error(new Error(ERROR_TEXT.generationFailed));
+        } catch (error) {
+          console.error("Anthropic stream failed", error);
+          controller.close();
         }
       },
     });
@@ -63,7 +66,8 @@ export async function POST(request: Request) {
         "Cache-Control": "no-cache",
       },
     });
-  } catch {
+  } catch (error) {
+    console.error("Generate article route failed", error);
     return NextResponse.json({ error: ERROR_TEXT.generationFailed }, { status: 500 });
   }
 }
