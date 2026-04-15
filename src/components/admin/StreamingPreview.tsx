@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { FiCheck, FiCopy, FiDownload, FiX } from "react-icons/fi";
 import { MdAutoAwesome } from "react-icons/md";
 
@@ -163,6 +163,8 @@ interface StreamingPreviewProps {
   parsedArticle?: GeneratedArticle | null;
   isGenerationComplete?: boolean;
   generationDurationMs?: number | null;
+  isBusy?: boolean;
+  onFixCheck?: (failedCheck: SeoCheckItem) => void;
   onImprove?: (failedChecks: SeoCheckItem[]) => void;
 }
 
@@ -172,6 +174,8 @@ export function StreamingPreview({
   parsedArticle,
   isGenerationComplete,
   generationDurationMs,
+  isBusy,
+  onFixCheck,
   onImprove,
 }: StreamingPreviewProps) {
   const [copied, setCopied] = useState(false);
@@ -460,6 +464,17 @@ export function StreamingPreview({
                     <div className="grid gap-0.5">
                       <span className="font-medium text-foreground">{check.label}</span>
                       <span className="text-xs text-muted-foreground">{check.detail}</span>
+                      {checksComplete && !check.passed && onFixCheck ? (
+                        <AiButton
+                          appearance="outline"
+                          className="mt-2 w-fit px-3 py-1.5 text-xs"
+                          disabled={isBusy}
+                          onClick={() => onFixCheck(check)}
+                          type="button"
+                        >
+                          Corregir este punto
+                        </AiButton>
+                      ) : null}
                     </div>
                   </li>
                 ))}

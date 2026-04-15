@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { ChangeEvent, FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import type { DragEvent } from "react";
-import { FiCheck, FiChevronLeft, FiChevronRight, FiImage, FiTrash2, FiUploadCloud } from "react-icons/fi";
+import { FiCheck, FiChevronLeft, FiChevronRight, FiImage, FiTrash2, FiUploadCloud, FiX } from "react-icons/fi";
 import { MdAutoAwesome } from "react-icons/md";
 
 import { StreamingPreview, type SeoCheckItem } from "@/components/admin/StreamingPreview";
@@ -294,6 +294,70 @@ function isValidImageUrl(url: string): boolean {
   }
 }
 
+function detectImageTypeFromUrl(url: string): string {
+  const normalized = url.trim().toLowerCase();
+  if (!normalized) return "otro";
+
+  if (normalized.startsWith("data:image/")) {
+    const mime = normalized.slice("data:image/".length).split(";")[0]?.trim() || "";
+    if (mime === "jpeg" || mime === "jpg") return "jpg";
+    if (mime === "png" || mime === "webp" || mime === "gif" || mime === "avif" || mime === "svg+xml") {
+      return mime === "svg+xml" ? "svg" : mime;
+    }
+    return "otro";
+  }
+
+  try {
+    const parsed = new URL(normalized);
+    const pathname = parsed.pathname.toLowerCase();
+    const ext = pathname.split(".").pop() ?? "";
+    if (ext === "jpeg" || ext === "jpg") return "jpg";
+    if (ext === "png" || ext === "webp" || ext === "gif" || ext === "avif" || ext === "svg") return ext;
+  } catch {
+    // ignore malformed URLs
+  }
+  return "otro";
+}
+
+interface ImageSeoTestResult {
+  passed: boolean;
+  title: string;
+  detail: string;
+  recommendation: string;
+}
+
+function runSingleImageSeoTest(option: ArticleImageOption): ImageSeoTestResult {
+  const imageType = detectImageTypeFromUrl(option.url);
+  const normalizedType = imageType.toLowerCase();
+  const isWebP = normalizedType === "webp";
+  const hasAlt = Boolean(option.alt?.trim());
+
+  if (isWebP && hasAlt) {
+    return {
+      passed: true,
+      title: "Imagen optimizada para SEO",
+      detail: `La imagen seleccionada (${normalizedType.toUpperCase()}) usa un formato eficiente y tiene alt text.`,
+      recommendation: "Puedes mantener esta imagen como destacada.",
+    };
+  }
+
+  if (!isWebP && hasAlt) {
+    return {
+      passed: false,
+      title: "Formato de imagen mejorable",
+      detail: `La imagen seleccionada (${normalizedType.toUpperCase()}) tiene alt text, pero WebP suele rendir mejor en SEO.`,
+      recommendation: "Convierte esta imagen a WebP para mejorar peso y Core Web Vitals.",
+    };
+  }
+
+  return {
+    passed: false,
+    title: "Falta optimización SEO en la imagen",
+    detail: `La imagen seleccionada (${normalizedType.toUpperCase()}) no está completamente optimizada (alt text/formato).`,
+    recommendation: "Añade alt text descriptivo y prioriza WebP.",
+  };
+}
+
 export function ArticleForm() {
   const articles = useArticleStore((state) => state.articles);
   const addArticle = useArticleStore((state) => state.addArticle);
@@ -311,10 +375,17 @@ export function ArticleForm() {
   const [imageUploadStatus, setImageUploadStatus] = useState<"idle" | "uploading" | "completed">("idle");
   const [pendingArticle, setPendingArticle] = useState<GeneratedArticle | null>(null);
   const [isPublished, setIsPublished] = useState(false);
+  const [isPublishing, setIsPublishing] = useState(false);
   const [requiresImageUpload, setRequiresImageUpload] = useState(false);
   const [showPublishToast, setShowPublishToast] = useState(false);
   const [activeImageOptionIndex, setActiveImageOptionIndex] = useState(0);
   const [generationDurationMs, setGenerationDurationMs] = useState<number | null>(null);
+  const [isFixingChecklistItem, setIsFixingChecklistItem] = useState(false);
+  const [showImageSeoPopup, setShowImageSeoPopup] = useState(false);
+  const [isImageSeoTestRunning, setIsImageSeoTestRunning] = useState(false);
+  const [imageSeoTestTargetLabel, setImageSeoTestTargetLabel] = useState("");
+  const [imageSeoTestTargetType, setImageSeoTestTargetType] = useState("");
+  const [imageSeoTestResult, setImageSeoTestResult] = useState<ImageSeoTestResult | null>(null);
   const [formColumnHeight, setFormColumnHeight] = useState<number | null>(null);
   const [webpPhase, setWebpPhase] = useState<"idle" | "reading" | "converting" | "optimizing" | "done" | "error">("idle");
   const [originalFileSize, setOriginalFileSize] = useState<number | null>(null);
@@ -323,6 +394,8 @@ export function ArticleForm() {
   const [isConvertingWebImages, setIsConvertingWebImages] = useState(false);
   // Tracks which article slugs have already had their web images queued for WebP conversion
   const processedSlugsRef = useRef<Set<string>>(new Set());
+  const autoAppliedUploadKeyRef = useRef<string>("");
+  const testedSelectedImagesRef = useRef<Set<string>>(new Set());
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const formColumnRef = useRef<HTMLDivElement | null>(null);
 
@@ -353,6 +426,9 @@ export function ArticleForm() {
   }, []);
 
   const imageOptionsCount = pendingArticle?.imageOptions?.length ?? 0;
+  const canApplyUploadedImage = Boolean(
+    pendingArticle && uploadedImageFile && imageUploadStatus === "completed",
+  );
 
   useEffect(() => {
     if (!imageOptionsCount) {
@@ -485,6 +561,7 @@ export function ArticleForm() {
     if (!file || !file.type.startsWith("image/")) {
       return;
     }
+    autoAppliedUploadKeyRef.current = "";
     setUploadedImageFile(file);
   }
 
@@ -493,6 +570,7 @@ export function ArticleForm() {
   }
 
   function clearUploadedImage() {
+    autoAppliedUploadKeyRef.current = "";
     setUploadedImageFile(null);
     setImageUploadProgress(0);
     setImageUploadStatus("idle");
@@ -575,19 +653,27 @@ export function ArticleForm() {
     try {
       // Prefer the already-converted WebP blob; fall back to raw data URL
       const imageDataUrl = convertedWebpUrl ?? (await readFileAsDataUrl(uploadedImageFile));
+      const uploadedOption: ArticleImageOption = {
+        url: imageDataUrl,
+        alt: pendingArticle.imageAltSuggestions[0] || uploadedImageFile.name,
+        source: "upload",
+      };
+      const existingOptions = pendingArticle.imageOptions ?? [];
+      const mergedOptions = [uploadedOption, ...existingOptions].filter(
+        (option, index, array) => array.findIndex((entry) => entry.url === option.url) === index,
+      );
       const updatedArticle: GeneratedArticle = {
         ...pendingArticle,
-        featuredImage: {
-          url: imageDataUrl,
-          alt: pendingArticle.imageAltSuggestions[0] || uploadedImageFile.name,
-          source: "upload",
-        },
+        featuredImage: uploadedOption,
+        imageOptions: mergedOptions,
       };
 
       await saveArticle(updatedArticle, "draft");
       setPendingArticle(updatedArticle);
+      setActiveImageOptionIndex(0);
       setRequiresImageUpload(false);
       setError("");
+      maybeRunImageSeoTestForSelection(uploadedOption, uploadedImageFile.name);
     } catch {
       setError(ERROR_TEXT.saveFailed);
     }
@@ -600,7 +686,7 @@ export function ArticleForm() {
 
     const selectedOption: ArticleImageOption = {
       ...option,
-      source: "web",
+      source: option.source === "upload" ? "upload" : "web",
       alt: option.alt || pendingArticle.imageAltSuggestions[0] || pendingArticle.seo.title,
     };
 
@@ -612,14 +698,90 @@ export function ArticleForm() {
     try {
       await saveArticle(updatedArticle, "draft");
       setPendingArticle(updatedArticle);
+      maybeRunImageSeoTestForSelection(selectedOption);
     } catch {
       setError(ERROR_TEXT.saveFailed);
     }
   }
 
+  function maybeRunImageSeoTestForSelection(option: ArticleImageOption, imageLabel?: string) {
+    const imageKey = option.url.trim();
+    if (!imageKey || testedSelectedImagesRef.current.has(imageKey)) {
+      return;
+    }
+    testedSelectedImagesRef.current.add(imageKey);
+
+    const normalizedType = detectImageTypeFromUrl(option.url);
+    setImageSeoTestTargetType(normalizedType.toUpperCase());
+    setImageSeoTestTargetLabel(imageLabel || option.alt || pendingArticle?.seo.title || "Imagen seleccionada");
+    setImageSeoTestResult(null);
+    setShowImageSeoPopup(true);
+    setIsImageSeoTestRunning(true);
+
+    window.setTimeout(() => {
+      setImageSeoTestResult(runSingleImageSeoTest(option));
+      setIsImageSeoTestRunning(false);
+    }, 520);
+  }
+
+  async function removeUploadedImageFromArticle() {
+    if (!pendingArticle) return;
+
+    const remainingOptions = (pendingArticle.imageOptions ?? []).filter((option) => option.source !== "upload");
+    const isUploadedFeatured = pendingArticle.featuredImage?.source === "upload";
+    const fallbackFeatured = remainingOptions[0];
+    const nextFeatured =
+      isUploadedFeatured && fallbackFeatured
+        ? {
+            ...fallbackFeatured,
+            alt: fallbackFeatured.alt || pendingArticle.imageAltSuggestions[0] || pendingArticle.seo.title,
+          }
+        : isUploadedFeatured
+          ? undefined
+          : pendingArticle.featuredImage;
+
+    const updatedArticle: GeneratedArticle = {
+      ...pendingArticle,
+      imageOptions: remainingOptions,
+      featuredImage: nextFeatured,
+    };
+
+    try {
+      await saveArticle(updatedArticle, "draft");
+      setPendingArticle(updatedArticle);
+      clearUploadedImage();
+      setRequiresImageUpload(!nextFeatured?.url);
+      setError("");
+    } catch {
+      setError(ERROR_TEXT.saveFailed);
+    }
+  }
+
+  useEffect(() => {
+    if (!pendingArticle || !uploadedImageFile || imageUploadStatus !== "completed") return;
+
+    const uploadKey = [
+      pendingArticle.seo.slug,
+      uploadedImageFile.name,
+      uploadedImageFile.size,
+      uploadedImageFile.lastModified,
+      convertedWebpUrl ?? "",
+    ].join("|");
+
+    if (autoAppliedUploadKeyRef.current === uploadKey) return;
+    autoAppliedUploadKeyRef.current = uploadKey;
+    void applyUploadedImageToPendingArticle();
+  }, [
+    pendingArticle,
+    uploadedImageFile,
+    imageUploadStatus,
+    convertedWebpUrl,
+  ]); // eslint-disable-line react-hooks/exhaustive-deps
+
   async function generateArticle() {
     const generationStartedAt = performance.now();
     processedSlugsRef.current.clear(); // reset so the new article's images get converted
+    testedSelectedImagesRef.current.clear();
     setError("");
     setStreamedText("");
     setGeneratedSlug("");
@@ -628,6 +790,7 @@ export function ArticleForm() {
     setRequiresImageUpload(false);
     setShowPublishToast(false);
     setGenerationDurationMs(null);
+    setIsFixingChecklistItem(false);
 
     if (!formData.title.trim() || !formData.metaDescription.trim()) {
       setError(ERROR_TEXT.requiredFields);
@@ -758,7 +921,7 @@ export function ArticleForm() {
   }
 
   async function handleApproveAndPublish() {
-    if (!pendingArticle) {
+    if (!pendingArticle || isPublishing) {
       return;
     }
 
@@ -768,6 +931,7 @@ export function ArticleForm() {
     }
 
     try {
+      setIsPublishing(true);
       await saveArticle(pendingArticle, "published");
       addArticle(pendingArticle);
       setGeneratedSlug(pendingArticle.seo.slug);
@@ -778,11 +942,74 @@ export function ArticleForm() {
       }, 2600);
     } catch {
       setError(ERROR_TEXT.saveFailed);
+    } finally {
+      setIsPublishing(false);
     }
   }
 
-  async function handleRegenerate() {
-    await generateArticle();
+  function handleDiscardGeneratedArticle() {
+    processedSlugsRef.current.clear();
+    testedSelectedImagesRef.current.clear();
+    autoAppliedUploadKeyRef.current = "";
+    clearUploadedImage();
+    setPendingArticle(null);
+    setStreamedText("");
+    setGeneratedSlug("");
+    setRequiresImageUpload(false);
+    setIsPublished(false);
+    setShowPublishToast(false);
+    setGenerationDurationMs(null);
+    setIsFixingChecklistItem(false);
+    setIsPublishing(false);
+    setError("");
+    setActiveImageOptionIndex(0);
+  }
+
+  async function handleFixChecklistItem(failedCheck: SeoCheckItem) {
+    if (!pendingArticle) return;
+
+    const label = failedCheck.label.toLowerCase();
+
+    // Local fast-path: convert the featured image to WebP.
+    if (label.includes("webp")) {
+      const featured = pendingArticle.featuredImage;
+      if (!featured?.url) {
+        setError(UI_TEXT.imageRequiredForPublish);
+        return;
+      }
+
+      try {
+        setIsFixingChecklistItem(true);
+        setError("");
+        const source = featured.url.startsWith("http")
+          ? `/api/image-proxy?url=${encodeURIComponent(featured.url)}`
+          : featured.url;
+        const { dataUrl } = await convertToWebP(source);
+
+        const updatedArticle: GeneratedArticle = {
+          ...pendingArticle,
+          featuredImage: {
+            ...featured,
+            url: dataUrl,
+            source: "upload",
+          },
+          imageOptions: (pendingArticle.imageOptions ?? []).map((option) =>
+            option.url === featured.url ? { ...option, url: dataUrl, source: "upload" } : option,
+          ),
+        };
+
+        await saveArticle(updatedArticle, "draft");
+        setPendingArticle(updatedArticle);
+      } catch {
+        setError(ERROR_TEXT.saveFailed);
+      } finally {
+        setIsFixingChecklistItem(false);
+      }
+      return;
+    }
+
+    // Fallback: use the existing IA flow for other unmet checks.
+    await handleImproveSeo([failedCheck]);
   }
 
   async function handleImproveSeo(failedChecks: SeoCheckItem[]) {
@@ -793,6 +1020,7 @@ export function ArticleForm() {
     setStreamedText("");
     setIsGenerating(true);
     setGenerationDurationMs(null);
+    setIsFixingChecklistItem(false);
 
     try {
       const response = await fetch("/api/improve-article", {
@@ -1051,15 +1279,17 @@ export function ArticleForm() {
                 </div>
               )}
 
-              {requiresImageUpload ? (
+              {requiresImageUpload || (pendingArticle && uploadedImageFile) ? (
                 <Button
                   className="mt-1"
-                  disabled={!uploadedImageFile}
+                  disabled={!canApplyUploadedImage}
                   onClick={applyUploadedImageToPendingArticle}
                   type="button"
                   variant="secondary"
                 >
-                  {UI_TEXT.imageApplyButton}
+                  {requiresImageUpload
+                    ? UI_TEXT.imageApplyButton
+                    : UI_TEXT.imageApplyUploadedOverrideButton}
                 </Button>
               ) : null}
             </div>
@@ -1098,6 +1328,8 @@ export function ArticleForm() {
           parsedArticle={pendingArticle}
           isGenerationComplete={!isGenerating && Boolean(streamedText)}
           generationDurationMs={generationDurationMs}
+          isBusy={isGenerating || isFixingChecklistItem}
+          onFixCheck={handleFixChecklistItem}
           onImprove={handleImproveSeo}
         />
       </div>
@@ -1113,7 +1345,7 @@ export function ArticleForm() {
             <ArticleContent article={pendingArticle} />
           </div>
 
-          {!uploadedImageFile && (pendingArticle.imageOptions?.length ?? 0) > 0 ? (
+          {(pendingArticle.imageOptions?.length ?? 0) > 0 ? (
             <div className="grid gap-4">
               <div className="grid gap-1">
                 <h3 className="font-heading text-xl font-semibold text-foreground">{UI_TEXT.imageOptionsTitle}</h3>
@@ -1136,6 +1368,7 @@ export function ArticleForm() {
                       // Use index as key so remounting doesn't occur when url changes to data URL
                       const isSelected = pendingArticle.featuredImage?.url === option.url;
                       const isActiveSlide = index === activeImageOptionIndex;
+                      const isUploadedOption = option.source === "upload";
                       const isWebP =
                         option.url.startsWith("data:image/webp") ||
                         option.url.toLowerCase().includes(".webp");
@@ -1151,13 +1384,28 @@ export function ArticleForm() {
                           <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent opacity-0 transition-opacity duration-200 group-hover:opacity-100" />
                           {/* WebP badge */}
                           {isWebP && (
-                            <span className="absolute right-3 top-3 rounded bg-emerald-500/90 px-1.5 py-0.5 font-mono text-xs font-semibold text-white backdrop-blur-sm">
+                            <span className="absolute left-3 top-3 rounded bg-emerald-500/90 px-1.5 py-0.5 font-mono text-xs font-semibold text-white backdrop-blur-sm">
                               WebP ✓
                             </span>
                           )}
+                          {isUploadedOption ? (
+                            <button
+                              aria-label={UI_TEXT.imageRemoveFileAria}
+                              className="absolute right-3 top-3 inline-flex h-8 w-8 items-center justify-center rounded-full bg-black/60 text-white backdrop-blur-sm transition-colors hover:bg-primary"
+                              onClick={removeUploadedImageFromArticle}
+                              title={UI_TEXT.imageRemoveFileAria}
+                              type="button"
+                            >
+                              <FiTrash2 className="h-4 w-4" />
+                            </button>
+                          ) : null}
                           <div className="absolute inset-x-3 bottom-3 flex items-center justify-between gap-2">
                             <Button
-                              className={`transition-opacity duration-200 ${isActiveSlide ? "opacity-0 group-hover:opacity-100" : "pointer-events-none opacity-0"}`}
+                              className={`transition-opacity duration-200 ${
+                                isActiveSlide
+                                  ? "opacity-100 md:opacity-0 md:group-hover:opacity-100"
+                                  : "pointer-events-none opacity-0"
+                              }`}
                               disabled={!isActiveSlide}
                               onClick={() => applyClaudeImageOption(option)}
                               type="button"
@@ -1221,22 +1469,110 @@ export function ArticleForm() {
                     ))}
                   </div>
                 ) : null}
+
+                <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border/70 bg-secondary/20 px-3 py-2.5">
+                  <p className="text-xs text-muted-foreground">{UI_TEXT.imageUploadFromPcOption}</p>
+                  <Button
+                    className="shrink-0"
+                    onClick={() => fileInputRef.current?.click()}
+                    type="button"
+                    variant="ghost"
+                  >
+                    {UI_TEXT.imageUploadFromPcButton}
+                  </Button>
+                </div>
               </div>
             </div>
           ) : null}
 
           {!isPublished ? (
-            <div className="flex flex-wrap gap-3">
-              <Button disabled={requiresImageUpload} onClick={handleApproveAndPublish}>
-                {UI_TEXT.approvePublishButton}
-              </Button>
-              <AiButton appearance="outline" onClick={handleRegenerate} type="button">
-                <MdAutoAwesome aria-hidden className="size-4 shrink-0" />
-                {UI_TEXT.regenerateButton}
-              </AiButton>
+            <div className="grid gap-2">
+              <div className="flex flex-wrap gap-3">
+                <Button disabled={requiresImageUpload || isPublishing} onClick={handleApproveAndPublish}>
+                  {isPublishing ? (
+                    <span className="inline-flex items-center gap-2">
+                      <LoadingSpinner />
+                      Aplicando y publicando...
+                    </span>
+                  ) : (
+                    UI_TEXT.approvePublishButton
+                  )}
+                </Button>
+                <AiButton appearance="outline" disabled={isPublishing} onClick={handleDiscardGeneratedArticle} type="button">
+                  <FiTrash2 aria-hidden className="size-4 shrink-0" />
+                  {UI_TEXT.regenerateButton}
+                </AiButton>
+              </div>
+              {isPublishing ? (
+                <p className="inline-flex items-center gap-2 text-xs text-muted-foreground">
+                  <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-primary" />
+                  Publicando artículo... Esto puede tardar unos segundos.
+                </p>
+              ) : null}
             </div>
           ) : null}
         </Card>
+      ) : null}
+
+      {showImageSeoPopup ? (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/70 px-4 backdrop-blur-sm">
+          <div className="relative w-full max-w-xl overflow-hidden rounded-2xl border border-primary/25 bg-card shadow-[0_24px_80px_-24px_rgba(212,48,30,0.55)]">
+            <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top,rgba(212,48,30,0.14),transparent_60%)]" />
+            <div className="relative grid gap-4 p-5 md:p-6">
+              <div className="flex items-start justify-between gap-3">
+                <div className="grid gap-1">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-primary">
+                    Test SEO de imagen
+                  </p>
+                  <h3 className="font-heading text-xl font-semibold text-foreground">
+                    Validando imagen {imageSeoTestTargetType}
+                  </h3>
+                  <p className="text-sm text-muted-foreground">{imageSeoTestTargetLabel}</p>
+                </div>
+                <button
+                  aria-label="Cerrar popup de test SEO de imagen"
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-secondary/70 text-muted-foreground transition-colors hover:text-foreground"
+                  onClick={() => setShowImageSeoPopup(false)}
+                  type="button"
+                >
+                  <FiX className="h-4 w-4" />
+                </button>
+              </div>
+
+              {isImageSeoTestRunning ? (
+                <div className="grid gap-3 rounded-xl border border-border bg-secondary/20 p-4">
+                  <div className="h-1.5 overflow-hidden rounded-full bg-secondary">
+                    <div className="h-full w-[78%] animate-pulse rounded-full bg-primary" />
+                  </div>
+                  <p className="text-sm text-muted-foreground">Ejecutando comprobaciones SEO para la imagen seleccionada...</p>
+                </div>
+              ) : imageSeoTestResult ? (
+                <div className="grid gap-3 rounded-xl border border-border bg-secondary/20 p-4">
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={`inline-flex h-5 w-5 items-center justify-center rounded-full text-white ${
+                        imageSeoTestResult.passed ? "bg-emerald-500" : "bg-amber-500"
+                      }`}
+                    >
+                      <FiCheck className="h-3 w-3" />
+                    </span>
+                    <p className="text-sm font-medium text-foreground">{imageSeoTestResult.title}</p>
+                  </div>
+                  <p className="text-sm text-muted-foreground">{imageSeoTestResult.detail}</p>
+                  <p className="rounded-lg border border-primary/20 bg-primary/5 px-3 py-2 text-xs text-primary">
+                    {imageSeoTestResult.recommendation}
+                  </p>
+                </div>
+              ) : null}
+
+              <div className="flex justify-end">
+                <AiButton className="px-5 py-2 text-sm" onClick={() => setShowImageSeoPopup(false)} type="button">
+                  Cerrar
+                </AiButton>
+              </div>
+            </div>
+          </div>
+        </div>
       ) : null}
 
       <div

@@ -146,11 +146,11 @@ export default function HomePage() {
           <AiPoweredBadge />
 
           <h1 className="bg-gradient-to-b from-white via-white to-white/40 bg-clip-text font-heading text-3xl font-medium leading-[1.06] text-transparent md:text-5xl lg:text-6xl">
-            Your full SEO article,
+            Tu artículo SEO completo,
             <br />
             <GradientMarqueeText
               gradientColors={["#5c150f", "#9e2319", "#d4301e", "#e85d4a", "#ff8f70", "#d4301e"]}
-              text="generated in one click."
+              text="generado en un clic."
             />
           </h1>
 

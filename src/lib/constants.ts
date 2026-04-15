@@ -68,13 +68,16 @@ export const UI_TEXT = {
     "Claude ha devuelto hasta 4 opciones. Selecciona la imagen que prefieras para el artículo.",
   imageUseOptionButton: "Usar esta imagen",
   imageSelectedLabel: "Seleccionada",
+  imageUploadFromPcOption: "Si no te convence ninguna sugerida, sube tu imagen desde el PC.",
+  imageUploadFromPcButton: "Subir imagen desde mi PC",
+  imageApplyUploadedOverrideButton: "Usar mi imagen como destacada",
   imageRequiredForPublish:
     "Para publicar este artículo necesitas subir una imagen porque el JSON no trajo una URL válida.",
   approvalTitle: "Vista previa antes de publicar",
   approvalDescription:
     "Revisa el artículo como lo verá el usuario final. Apruébalo para publicarlo o regénéralo.",
-  approvePublishButton: "Aprobar y Publicar",
-  regenerateButton: "Regenerar artículo",
+  approvePublishButton: "Aplicar y Publicar",
+  regenerateButton: "Descartar",
   publishSuccessToast: "Artículo publicado correctamente.",
   duplicateTitleError: "Ya existe un artículo con este título. Cambia el título o regenera otro.",
   generateButton: "Generar Articulo",

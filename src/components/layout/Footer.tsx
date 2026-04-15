@@ -19,7 +19,7 @@ export function Footer() {
       <div className="relative mx-auto w-full max-w-6xl px-6 pb-10 pt-14 md:pb-12 md:pt-16">
         <div className="grid gap-12 md:grid-cols-12 md:gap-8">
           <div className="md:col-span-5">
-            <p className="font-heading text-lg font-semibold tracking-tight text-foreground">{APP_CONFIG.brandName}</p>
+            <p className="font-heading text-lg font-semibold tracking-tight text-foreground">Propulsa</p>
             <p className="mt-4 max-w-md text-sm leading-relaxed text-muted-foreground">{UI_TEXT.footerTagline}</p>
           </div>
 
@@ -63,7 +63,7 @@ export function Footer() {
 
         <div className="mt-14 flex flex-col gap-4 border-t border-border/60 pt-8 text-xs text-muted-foreground md:flex-row md:items-center md:justify-between">
           <p>
-            © {year} {APP_CONFIG.brandName}. {APP_CONFIG.siteName}.
+            © {year} Propulsa. {APP_CONFIG.siteName}.
           </p>
           <p className="max-w-prose text-right md:text-left">{UI_TEXT.footerText}</p>
         </div>
