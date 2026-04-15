@@ -103,7 +103,9 @@ export const UI_TEXT = {
   copySitemapButton: "Copiar Sitemap Entry",
   articleNotFound: "Artículo no encontrado en memoria.",
   backToBlog: "Volver al blog",
-  footerText: "Demo técnica SEO sin persistencia",
+  footerText: "Demo técnica · Sin base de datos",
+  footerTagline:
+    "Generación de artículos SEO con Claude AI: streaming en vivo, JSON estructurado, imágenes WebP y auditoría antes de publicar.",
   loginTitle: "Acceso Administrador",
   loginDescription: "Inicia sesión para acceder al panel y a las vistas internas.",
   loginUserLabel: "Usuario",

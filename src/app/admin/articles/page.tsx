@@ -4,7 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { FiArrowRight, FiCalendar, FiFileText, FiPlus, FiTag } from "react-icons/fi";
 
-import { Button } from "@/components/ui/Button";
+import { AiLinkButton } from "@/components/ui/AiButton";
 import { ROUTES } from "@/lib/constants";
 import { useArticleStore } from "@/stores/useArticleStore";
 
@@ -31,12 +31,10 @@ export default function AdminArticlesPage() {
           <p className="mt-1 max-w-xs text-sm text-muted-foreground">
             Genera tu primer artículo SEO y aparecerá aquí.
           </p>
-          <Link href={ROUTES.admin} className="mt-6">
-            <Button className="inline-flex items-center gap-2">
-              <FiPlus className="h-4 w-4" />
-              Generar artículo
-            </Button>
-          </Link>
+          <AiLinkButton className="mt-6" href={ROUTES.admin}>
+            <FiPlus className="h-4 w-4" />
+            Generar artículo
+          </AiLinkButton>
         </div>
       </div>
     );
@@ -52,12 +50,10 @@ export default function AdminArticlesPage() {
             {articles.length} {articles.length === 1 ? "artículo generado" : "artículos generados"} en esta sesión.
           </p>
         </div>
-        <Link href={ROUTES.admin}>
-          <Button className="inline-flex items-center gap-2">
-            <FiPlus className="h-4 w-4" />
-            Nuevo artículo
-          </Button>
-        </Link>
+        <AiLinkButton href={ROUTES.admin}>
+          <FiPlus className="h-4 w-4" />
+          Nuevo artículo
+        </AiLinkButton>
       </div>
 
       {/* Articles grid */}

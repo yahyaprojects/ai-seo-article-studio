@@ -1,9 +1,7 @@
 "use client";
 
-import Link from "next/link";
-
 import { ArticleCard } from "@/components/blog/ArticleCard";
-import { Button } from "@/components/ui/Button";
+import { AiLinkButton } from "@/components/ui/AiButton";
 import { Card } from "@/components/ui/Card";
 import { ROUTES, UI_TEXT } from "@/lib/constants";
 import { useArticleStore } from "@/stores/useArticleStore";
@@ -27,9 +25,9 @@ export default function PreviewPage() {
       ) : (
         <Card className="grid gap-4">
           <p className="text-base text-muted-foreground">{UI_TEXT.emptyStateTitle}</p>
-          <Link href={ROUTES.admin}>
-            <Button>{UI_TEXT.emptyStateCta}</Button>
-          </Link>
+          <AiLinkButton className="w-fit" href={ROUTES.admin}>
+            {UI_TEXT.emptyStateCta}
+          </AiLinkButton>
         </Card>
       )}
     </section>

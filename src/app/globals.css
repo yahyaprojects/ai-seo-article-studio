@@ -91,3 +91,24 @@
     font-size: var(--font-size-placeholder);
   }
 }
+
+@keyframes ai-powered-badge-shine {
+  0% {
+    transform: translateX(-20%) skewX(-14deg);
+    opacity: 0;
+  }
+  12% {
+    opacity: 0.55;
+  }
+  42% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateX(320%) skewX(-14deg);
+    opacity: 0;
+  }
+}
+
+.ai-powered-badge__shine {
+  animation: ai-powered-badge-shine 3.2s ease-in-out infinite;
+}

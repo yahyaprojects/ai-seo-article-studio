@@ -12,8 +12,12 @@ import {
 } from "react-icons/fi";
 import { MdAutoAwesome } from "react-icons/md";
 
+import { AiLinkButton } from "@/components/ui/AiButton";
 import { Button } from "@/components/ui/Button";
+import { AiPoweredBadge } from "@/components/ui/AiPoweredBadge";
+import { GradientMarqueeText } from "@/components/ui/GradientMarqueeText";
 import { Card } from "@/components/ui/Card";
+import { TechStackMarquee } from "@/components/marketing/TechStackMarquee";
 import LightPillar from "@/components/ui/LightPillar";
 import { ROUTES } from "@/lib/constants";
 
@@ -103,13 +107,6 @@ const seoChecks = [
   { label: "Imagen destacada en formato WebP", pass: false },
 ];
 
-const stats = [
-  { value: "14", label: "Criterios SEO" },
-  { value: "WebP", label: "Formato imagen" },
-  { value: "< 8 s", label: "Generación" },
-  { value: "100", label: "Score máximo" },
-];
-
 const techStack = [
   "Claude AI",
   "Next.js 15",
@@ -125,7 +122,7 @@ export default function HomePage() {
       {/* ── Hero ─────────────────────────────────────────────────────────── */}
       <div
         id="home-hero"
-        className="relative left-1/2 right-1/2 -mx-[50vw] -mt-16 min-h-screen w-screen overflow-hidden"
+        className="relative left-1/2 right-1/2 -mx-[50vw] -mt-16 min-h-[100vh] w-screen overflow-hidden"
       >
         <div className="absolute inset-0">
           <LightPillar
@@ -145,19 +142,16 @@ export default function HomePage() {
         <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(rgba(255,58,36,0.04)_1px,transparent_1px),linear-gradient(90deg,rgba(255,58,36,0.04)_1px,transparent_1px)] bg-[size:60px_60px]" />
         <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-40 bg-gradient-to-t from-background to-transparent" />
 
-        <div className="relative z-10 mx-auto flex min-h-screen max-w-5xl flex-col items-center justify-center gap-8 px-6 pb-20 pt-28 text-center">
-          {/* Badge */}
-          <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-1.5 text-xs font-medium uppercase tracking-widest text-white/60 backdrop-blur-sm">
-            <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-primary" />
-            Demo SEO · Powered by Claude AI
-          </span>
+        <div className="relative z-10 mx-auto flex min-h-[100vh] max-w-5xl flex-col items-center justify-center gap-8 px-6 pb-20 pt-28 text-center">
+          <AiPoweredBadge />
 
-          <h1 className="bg-gradient-to-b from-white via-white to-white/40 bg-clip-text font-heading text-5xl font-bold leading-tight text-transparent md:text-7xl lg:text-8xl">
-            Contenido SEO
+          <h1 className="bg-gradient-to-b from-white via-white to-white/40 bg-clip-text font-heading text-3xl font-medium leading-[1.06] text-transparent md:text-5xl lg:text-6xl">
+            Your full SEO article,
             <br />
-            <span className="bg-gradient-to-r from-primary via-orange-400 to-primary bg-clip-text text-transparent">
-              generado por IA
-            </span>
+            <GradientMarqueeText
+              gradientColors={["#5c150f", "#9e2319", "#d4301e", "#e85d4a", "#ff8f70", "#d4301e"]}
+              text="generated in one click."
+            />
           </h1>
 
           <p className="mx-auto max-w-2xl text-base text-white/70 md:text-xl">
@@ -166,49 +160,26 @@ export default function HomePage() {
           </p>
 
           <div className="flex flex-wrap justify-center gap-3">
-            <Link href={ROUTES.login}>
-              <Button className="inline-flex items-center gap-2 px-6 py-3 text-base">
-                <MdAutoAwesome className="h-4 w-4" aria-hidden />
-                Acceder al panel
-                <FiArrowUpRight className="h-4 w-4" aria-hidden />
-              </Button>
-            </Link>
+            <AiLinkButton href={ROUTES.login}>
+              <MdAutoAwesome className="h-4 w-4" aria-hidden />
+              Acceder al panel
+              <FiArrowUpRight className="h-4 w-4" aria-hidden />
+            </AiLinkButton>
             <a href="#como-funciona">
               <Button variant="ghost" className="px-6 py-3 text-base text-white/70 hover:text-white">
                 Ver cómo funciona
               </Button>
             </a>
           </div>
-
-          {/* Stats strip */}
-          <div className="mt-2 grid grid-cols-2 gap-3 sm:grid-cols-4">
-            {stats.map(({ value, label }) => (
-              <div
-                key={label}
-                className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-center backdrop-blur-sm"
-              >
-                <p className="font-heading text-2xl font-bold text-white">{value}</p>
-                <p className="mt-0.5 text-xs text-white/50">{label}</p>
-              </div>
-            ))}
-          </div>
         </div>
       </div>
 
-      {/* ── Content ──────────────────────────────────────────────────────── */}
-      <div className="mx-auto grid w-full max-w-6xl gap-20 px-6 pb-24 pt-10">
+      <TechStackMarquee items={techStack} />
 
-        {/* ── Tech strip ── */}
-        <div className="flex flex-wrap items-center justify-center gap-x-8 gap-y-4 opacity-45">
-          {techStack.map((tech) => (
-            <span key={tech} className="font-mono text-xs uppercase tracking-[0.18em] text-muted-foreground">
-              {tech}
-            </span>
-          ))}
-        </div>
-
+      {/* ── Content: one viewport height per section ─────────────────────── */}
+      <div className="w-full">
         {/* ── Features ── */}
-        <section className="grid gap-8">
+        <section className="mx-auto flex min-h-[100vh] w-full max-w-6xl flex-col justify-center gap-8 px-6 py-16 md:py-20">
           <div className="grid gap-2 text-center">
             <p className="text-xs font-medium uppercase tracking-widest text-primary">Capacidades</p>
             <h2 className="font-heading text-4xl font-bold text-foreground">
@@ -239,7 +210,10 @@ export default function HomePage() {
         </section>
 
         {/* ── How it works ── */}
-        <section id="como-funciona" className="grid gap-8">
+        <section
+          id="como-funciona"
+          className="mx-auto flex min-h-[100vh] w-full max-w-6xl flex-col justify-center gap-8 px-6 py-16 md:py-20"
+        >
           <div className="grid gap-2 text-center">
             <p className="text-xs font-medium uppercase tracking-widest text-primary">Flujo editorial</p>
             <h2 className="font-heading text-4xl font-bold text-foreground">
@@ -268,7 +242,8 @@ export default function HomePage() {
         </section>
 
         {/* ── WebP optimisation highlight ── */}
-        <section className="overflow-hidden rounded-2xl border border-border bg-secondary/20">
+        <section className="mx-auto flex min-h-[100vh] w-full max-w-6xl flex-col justify-center px-6 py-16 md:py-20">
+          <div className="overflow-hidden rounded-2xl border border-border bg-secondary/20">
           <div className="grid md:grid-cols-2">
             <div className="grid gap-5 p-8 md:p-12">
               <span className="inline-flex items-center gap-2 text-xs font-medium uppercase tracking-widest text-primary">
@@ -337,10 +312,11 @@ export default function HomePage() {
               </div>
             </div>
           </div>
+          </div>
         </section>
 
         {/* ── SEO checklist preview ── */}
-        <section className="grid gap-8 md:grid-cols-2 md:items-center">
+        <section className="mx-auto grid min-h-[100vh] w-full max-w-6xl grid-cols-1 content-center gap-8 px-6 py-16 md:grid-cols-2 md:items-center md:py-20">
           <div className="grid gap-5">
             <span className="inline-flex items-center gap-2 text-xs font-medium uppercase tracking-widest text-primary">
               <FiCheckCircle className="h-3.5 w-3.5" /> Auditoría automática
@@ -356,11 +332,9 @@ export default function HomePage() {
               <span className="font-medium text-foreground">«Perfeccionar SEO con IA»</span> reenvía los criterios
               fallidos a Claude para corregirlos automáticamente.
             </p>
-            <Link href={ROUTES.login}>
-              <Button className="inline-flex w-fit items-center gap-2">
-                Ver en acción <FiArrowUpRight className="h-4 w-4" />
-              </Button>
-            </Link>
+            <AiLinkButton className="w-fit" href={ROUTES.login}>
+              Ver en acción <FiArrowUpRight className="h-4 w-4" />
+            </AiLinkButton>
           </div>
 
           <div className="rounded-xl border border-border bg-card p-4">
@@ -405,7 +379,8 @@ export default function HomePage() {
         </section>
 
         {/* ── Claude streaming terminal ── */}
-        <section className="relative overflow-hidden rounded-2xl border border-primary/20 bg-gradient-to-br from-primary/5 via-background to-background p-8 md:p-12">
+        <section className="mx-auto flex min-h-[100vh] w-full max-w-6xl flex-col justify-center px-6 py-16 md:py-20">
+          <div className="relative overflow-hidden rounded-2xl border border-primary/20 bg-gradient-to-br from-primary/5 via-background to-background p-8 md:p-12">
           <div className="pointer-events-none absolute right-0 top-0 h-72 w-72 rounded-full bg-primary/10 blur-3xl" />
           <div className="relative grid gap-6 md:grid-cols-2 md:items-center">
             <div className="grid gap-4">
@@ -472,9 +447,11 @@ export default function HomePage() {
               </div>
             </div>
           </div>
+          </div>
         </section>
 
         {/* ── Final CTA ── */}
+        <section className="mx-auto flex min-h-[100vh] w-full max-w-6xl flex-col justify-center px-6 py-16 md:py-20">
         <Card className="relative overflow-hidden rounded-2xl text-center">
           <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-transparent" />
           <div className="relative grid gap-5 p-4 md:p-8">
@@ -492,16 +469,15 @@ export default function HomePage() {
               imágenes se convierten a WebP automáticamente con el checklist SEO validándolo todo.
             </p>
             <div className="flex flex-wrap items-center justify-center gap-3">
-              <Link href={ROUTES.login}>
-                <Button className="inline-flex items-center gap-2 px-8 py-3 text-base">
-                  <MdAutoAwesome className="h-4 w-4" aria-hidden />
-                  Empezar ahora
-                  <FiArrowUpRight className="h-4 w-4" aria-hidden />
-                </Button>
-              </Link>
+              <AiLinkButton className="px-8" href={ROUTES.login}>
+                <MdAutoAwesome className="h-4 w-4" aria-hidden />
+                Empezar ahora
+                <FiArrowUpRight className="h-4 w-4" aria-hidden />
+              </AiLinkButton>
             </div>
           </div>
         </Card>
+        </section>
       </div>
     </section>
   );

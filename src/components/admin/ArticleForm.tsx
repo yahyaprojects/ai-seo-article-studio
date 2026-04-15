@@ -8,6 +8,7 @@ import { MdAutoAwesome } from "react-icons/md";
 
 import { StreamingPreview, type SeoCheckItem } from "@/components/admin/StreamingPreview";
 import { ArticleContent } from "@/components/blog/ArticleContent";
+import { AiButton } from "@/components/ui/AiButton";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
@@ -1062,7 +1063,7 @@ export function ArticleForm() {
                 </Button>
               ) : null}
             </div>
-            <Button className="inline-flex items-center justify-center gap-2" disabled={isGenerating} type="submit">
+            <AiButton className="w-full sm:w-auto" disabled={isGenerating} type="submit">
               {isGenerating ? (
                 <>
                   <LoadingSpinner />
@@ -1074,7 +1075,7 @@ export function ArticleForm() {
                   {UI_TEXT.generateButton}
                 </>
               )}
-            </Button>
+            </AiButton>
 
             {error ? <p className="text-sm text-primary">{error}</p> : null}
             {generatedSlug ? (
@@ -1229,9 +1230,10 @@ export function ArticleForm() {
               <Button disabled={requiresImageUpload} onClick={handleApproveAndPublish}>
                 {UI_TEXT.approvePublishButton}
               </Button>
-              <Button onClick={handleRegenerate} variant="ghost">
+              <AiButton appearance="outline" onClick={handleRegenerate} type="button">
+                <MdAutoAwesome aria-hidden className="size-4 shrink-0" />
                 {UI_TEXT.regenerateButton}
-              </Button>
+              </AiButton>
             </div>
           ) : null}
         </Card>

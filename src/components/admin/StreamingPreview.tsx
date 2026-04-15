@@ -1,8 +1,10 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { FiCheck, FiCopy, FiDownload, FiStar, FiX } from "react-icons/fi";
+import { FiCheck, FiCopy, FiDownload, FiX } from "react-icons/fi";
+import { MdAutoAwesome } from "react-icons/md";
 
+import { AiButton } from "@/components/ui/AiButton";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { UI_TEXT } from "@/lib/constants";
@@ -492,14 +494,10 @@ export function StreamingPreview({
                 <div className="mt-4 flex flex-col gap-2">
                   {/* Perfeccionar SEO — only when score < 100 */}
                   {canImprove && (
-                    <Button
-                      className="w-full inline-flex items-center justify-center gap-2"
-                      onClick={() => onImprove!(failedChecks)}
-                      type="button"
-                    >
-                      <FiStar className="h-4 w-4" />
+                    <AiButton fullWidth onClick={() => onImprove!(failedChecks)} type="button">
+                      <MdAutoAwesome aria-hidden className="size-4 shrink-0" />
                       Perfeccionar SEO con IA
-                    </Button>
+                    </AiButton>
                   )}
 
                   <Button
