@@ -237,17 +237,32 @@ function readFileAsDataUrl(file: File): Promise<string> {
   });
 }
 
+interface WebPConversionOptions {
+  quality?: number;
+  maxDimension?: number;
+}
+
 /** Convert a File or same-origin URL to a WebP data URL via canvas. */
-function convertToWebP(source: File | string): Promise<{ dataUrl: string; size: number }> {
+function convertToWebP(
+  source: File | string,
+  options?: WebPConversionOptions,
+): Promise<{ dataUrl: string; size: number }> {
   return new Promise((resolve, reject) => {
+    const quality = options?.quality ?? 0.82;
+    const maxDimension = options?.maxDimension ?? 1600;
     const img = new Image();
     const objectUrl = source instanceof File ? URL.createObjectURL(source) : null;
     const src = objectUrl ?? (source as string);
 
     img.onload = () => {
       const canvas = document.createElement("canvas");
-      canvas.width = img.naturalWidth;
-      canvas.height = img.naturalHeight;
+      const naturalWidth = img.naturalWidth;
+      const naturalHeight = img.naturalHeight;
+      const largestSide = Math.max(naturalWidth, naturalHeight);
+      const scale = largestSide > maxDimension ? maxDimension / largestSide : 1;
+
+      canvas.width = Math.max(1, Math.round(naturalWidth * scale));
+      canvas.height = Math.max(1, Math.round(naturalHeight * scale));
       const ctx = canvas.getContext("2d");
       if (!ctx) {
         if (objectUrl) URL.revokeObjectURL(objectUrl);
@@ -269,7 +284,7 @@ function convertToWebP(source: File | string): Promise<{ dataUrl: string; size: 
           reader.readAsDataURL(blob);
         },
         "image/webp",
-        0.85,
+        quality,
       );
     };
 
@@ -984,7 +999,7 @@ export function ArticleForm() {
         const source = featured.url.startsWith("http")
           ? `/api/image-proxy?url=${encodeURIComponent(featured.url)}`
           : featured.url;
-        const { dataUrl } = await convertToWebP(source);
+        const { dataUrl } = await convertToWebP(source, { maxDimension: 1200, quality: 0.72 });
 
         const updatedArticle: GeneratedArticle = {
           ...pendingArticle,
